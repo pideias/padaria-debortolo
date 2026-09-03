@@ -2,6 +2,9 @@
 
 ## Iniciar a API
 
+No instalador, abra o atalho **Padaria Debortolo**. Ele inicia automaticamente a API local,
+o desktop e o backup do Google Drive quando encontrar uma credencial OAuth no computador.
+
 Na raiz do projeto:
 
 ```powershell
@@ -37,7 +40,9 @@ Para acessar a API fora do PC, configure um token e use o mesmo token no app:
 ```powershell
 $env:PADARIA_API_TOKEN = 'gere-um-token-longo-e-aleatorio'
 flutter build apk --release --dart-define=API_BASE_URL=https://sua-api.example `
-  --dart-define=API_ACCESS_TOKEN=gere-um-token-longo-e-aleatorio
+  --dart-define=API_ACCESS_TOKEN=gere-um-token-longo-e-aleatorio `
+  --dart-define=API_WRITE_BASE_URL=http://IP_DO_PC:5049 `
+  --dart-define=API_LOCAL_URL=http://IP_DO_PC:5049
 ```
 
 Use o token de leitura (`ReadOnlyToken`) no mobile. Ele pode consultar o estoque,
