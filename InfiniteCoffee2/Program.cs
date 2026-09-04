@@ -16,6 +16,8 @@ namespace InfiniteCoffee2
                 Banco.Configurar(
                     Environment.GetEnvironmentVariable("PADARIA_CONNECTION_STRING") ??
                     builder.Configuration.GetConnectionString("DefaultConnection"));
+                Banco.GarantirTabelaMovimentacoes();
+                Banco.GarantirEstruturaSync();
             }
 
             builder.Services.AddControllersWithViews();
@@ -24,9 +26,11 @@ namespace InfiniteCoffee2
             builder.Services.AddHttpClient<GoogleDriveSnapshotStore>();
             builder.Services.AddCors(options =>
             {
-                // O trabalho demonstrativo usa a API a partir do web, desktop e mobile.
+                var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+                    ?? new[] { "http://localhost:5049", "http://localhost:7054" };
+
                 options.AddPolicy("FlutterDevelopment", policy => policy
-                    .AllowAnyOrigin()
+                    .WithOrigins(allowedOrigins)
                     .AllowAnyHeader()
                     .AllowAnyMethod());
             });
@@ -66,13 +70,16 @@ namespace InfiniteCoffee2
             app.UseRouting();
             app.UseCors("FlutterDevelopment");
 
-            // Swagger fica disponível para o grupo testar as APIs durante o desenvolvimento.
-            app.UseSwagger();
-            app.UseSwaggerUI(options =>
+            // Swagger fica disponível apenas durante o desenvolvimento.
+            if (app.Environment.IsDevelopment())
             {
-                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Infinite Coffee API v1");
-                options.RoutePrefix = "swagger";
-            });
+                app.UseSwagger();
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Infinite Coffee API v1");
+                    options.RoutePrefix = "swagger";
+                });
+            }
 
             app.UseAuthorization();
 

@@ -8,6 +8,7 @@
     <div class="alert alert-success">@TempData["Mensagem"]</div>
 }
 
+<div class="table-responsive">
 <table class="table table-striped">
     <thead>
         <tr>
@@ -32,6 +33,7 @@
                 </td>
                 <td>
                     <form method="post" action="/Mesa/AlterarStatus" class="d-flex gap-2">
+                        @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@m["id_mesa"]" />
                         <select name="status" class="form-select form-select-sm">
                             <option>Disponível</option>
@@ -45,3 +47,4 @@
         }
     </tbody>
 </table>
+</div>

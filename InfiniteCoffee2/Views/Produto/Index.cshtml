@@ -11,6 +11,7 @@
 <a href="/Produto/Cadastrar" class="btn btn-primary mb-3">+ Novo Produto</a>
 <button type="button" class="btn btn-secondary mb-3" data-bs-toggle="modal" data-bs-target="#novoProdutoModal">Cadastrar com estoque</button>
 
+<div class="table-responsive">
 <table class="table table-striped">
     <thead>
         <tr>
@@ -37,13 +38,17 @@
                 <td>@(p["descricao"] is DBNull ? "" : p["descricao"])</td>
                 <td>
                     <a href="/Produto/Editar/@p["id_produto"]" class="btn btn-sm btn-warning">Editar</a>
-                    <a href="/Produto/Excluir/@p["id_produto"]" class="btn btn-sm btn-danger"
-                       onclick="return confirm('Confirmar exclusão?')">Excluir</a>
+                    <form method="post" action="/Produto/Excluir/@p["id_produto"]" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-danger"
+                                onclick="return confirm('Confirmar exclusão?')">Excluir</button>
+                    </form>
                 </td>
             </tr>
         }
     </tbody>
 </table>
+</div>
 
 <!-- Dialogo adicionado ao HTML existente para cadastrar produto e saldo inicial. -->
 <div class="modal fade" id="novoProdutoModal" tabindex="-1" aria-labelledby="novoProdutoTitulo" aria-hidden="true">

@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 using InfiniteCoffee2.Models;
 
@@ -19,14 +20,31 @@ namespace InfiniteCoffee2.Data
         // CLIENTES
         // =========================
 
+        public static Dictionary<string, object>? BuscarClientePorId(int id)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("SELECT id_cliente, nome_cliente, email, telefone FROM Clientes WHERE id_cliente = @id", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return new Dictionary<string, object>
+            {
+                ["id_cliente"] = reader["id_cliente"],
+                ["nome_cliente"] = reader["nome_cliente"],
+                ["email"] = reader["email"],
+                ["telefone"] = reader["telefone"]
+            };
+        }
+
         public static List<Dictionary<string, object>> ListarClientes()
         {
             var lista = new List<Dictionary<string, object>>();
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ListarClientes", conn) { CommandType = CommandType.StoredProcedure };
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("sp_ListarClientes", conn) { CommandType = CommandType.StoredProcedure };
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -45,9 +63,9 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_BuscarCliente", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_BuscarCliente", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@valor", valor);
-                var reader = cmd.ExecuteReader();
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -60,12 +78,53 @@ namespace InfiniteCoffee2.Data
             return lista;
         }
 
+        public static Dictionary<string, object>? BuscarClientePorNomeEmail(string nome, string email)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT TOP 1 id_cliente, nome_cliente, email, telefone
+                FROM Clientes
+                WHERE LOWER(LTRIM(RTRIM(nome_cliente))) = LOWER(@nome)
+                  AND LOWER(LTRIM(RTRIM(email))) = LOWER(@email)", conn);
+            cmd.Parameters.AddWithValue("@nome", nome.Trim());
+            cmd.Parameters.AddWithValue("@email", email.Trim());
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+
+            return new Dictionary<string, object>
+            {
+                ["id_cliente"] = reader["id_cliente"],
+                ["nome_cliente"] = reader["nome_cliente"],
+                ["email"] = reader["email"],
+                ["telefone"] = reader["telefone"]
+            };
+        }
+
+        public static Dictionary<string, object>? BuscarClientePorId(int id)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("SELECT TOP 1 id_cliente, nome_cliente, email, telefone FROM Clientes WHERE id_cliente = @id", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+
+            return new Dictionary<string, object>
+            {
+                ["id_cliente"] = reader["id_cliente"],
+                ["nome_cliente"] = reader["nome_cliente"],
+                ["email"] = reader["email"],
+                ["telefone"] = reader["telefone"]
+            };
+        }
+
         public static void CadastrarCliente(string nome, string email, string telefone)
         {
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_CadastrarCliente", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_CadastrarCliente", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@nome", nome);
                 cmd.Parameters.AddWithValue("@email", email);
                 cmd.Parameters.AddWithValue("@telefone", telefone);
@@ -78,7 +137,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_AtualizarCliente", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_AtualizarCliente", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.Parameters.AddWithValue("@nome", nome);
                 cmd.Parameters.AddWithValue("@email", email);
@@ -92,7 +151,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ExcluirCliente", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_ExcluirCliente", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.ExecuteNonQuery();
             }
@@ -102,15 +161,36 @@ namespace InfiniteCoffee2.Data
         // PRODUTOS
         // =========================
 
+        public static Dictionary<string, object>? BuscarProdutoPorId(int id)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("SELECT id_produto, nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao FROM Produtos WHERE id_produto = @id AND ativo = 1", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return new Dictionary<string, object>
+            {
+                ["id_produto"] = reader["id_produto"],
+                ["nome_produto"] = reader["nome_produto"],
+                ["preco"] = reader["preco"],
+                ["tipo"] = reader["tipo"],
+                ["quantidade_estoque"] = reader["quantidade_estoque"],
+                ["codigo_barras"] = reader["codigo_barras"],
+                ["descricao"] = reader["descricao"]
+            };
+        }
+
         public static List<Dictionary<string, object>> ListarProdutos()
         {
+            GarantirEstruturaEstoque();
             var lista = new List<Dictionary<string, object>>();
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
                 // Consulta direta mantém a tela compatível mesmo antes das procedures opcionais.
-                var cmd = new SqlCommand("SELECT id_produto, nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao FROM Produtos WHERE ativo = 1 ORDER BY nome_produto", conn);
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("SELECT id_produto, nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao FROM Produtos WHERE ativo = 1 ORDER BY nome_produto", conn);
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -128,10 +208,11 @@ namespace InfiniteCoffee2.Data
 
         public static void CadastrarProduto(string nome, decimal preco, string tipo, int quantidade, string codigoBarras, string descricao)
         {
+            GarantirEstruturaEstoque();
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("INSERT INTO Produtos (nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao) VALUES (@nome, @preco, @tipo, @quantidade, @codigoBarras, @descricao)", conn);
+                using var cmd = new SqlCommand("INSERT INTO Produtos (nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao) VALUES (@nome, @preco, @tipo, @quantidade, @codigoBarras, @descricao)", conn);
                 cmd.Parameters.AddWithValue("@nome", nome);
                 cmd.Parameters.AddWithValue("@preco", preco);
                 cmd.Parameters.AddWithValue("@tipo", tipo);
@@ -147,7 +228,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_AtualizarProduto", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_AtualizarProduto", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.Parameters.AddWithValue("@nome", nome);
                 cmd.Parameters.AddWithValue("@preco", preco);
@@ -193,7 +274,21 @@ namespace InfiniteCoffee2.Data
 
         public static List<Dictionary<string, object>> ListarEstoqueBaixo(int limite = 5)
         {
-            return ListarEstoque().Where(item => Convert.ToInt32(item["quantidade_estoque"]) <= limite).ToList();
+            GarantirTabelaMovimentacoes();
+            var lista = new List<Dictionary<string, object>>();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("SELECT id_produto, nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao FROM Produtos WHERE ativo = 1 AND quantidade_estoque <= @limite ORDER BY quantidade_estoque ASC", conn);
+            cmd.Parameters.AddWithValue("@limite", limite);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["id_produto"] = reader["id_produto"], ["nome_produto"] = reader["nome_produto"], ["preco"] = reader["preco"],
+                    ["tipo"] = reader["tipo"], ["quantidade_estoque"] = reader["quantidade_estoque"],
+                    ["codigo_barras"] = reader["codigo_barras"], ["descricao"] = reader["descricao"]
+                });
+            return lista;
         }
 
         public static List<Dictionary<string, object>> ListarMovimentacoesEstoque()
@@ -252,6 +347,7 @@ namespace InfiniteCoffee2.Data
         /// </summary>
         public static void GarantirEstruturaSync()
         {
+            GarantirEstruturaEstoque();
             using var conn = new SqlConnection(connectionString);
             conn.Open();
             // Estrutura de sync criada sob demanda: banco novo e banco existente
@@ -433,18 +529,39 @@ namespace InfiniteCoffee2.Data
                 transaction.Commit();
                 return pedidoId;
             }
-            catch
+            catch (Exception ex)
             {
+                Trace.TraceError($"[Banco.FinalizarVenda] Erro ao finalizar venda: {ex}");
                 transaction.Rollback();
                 return 0;
             }
         }
 
-        private static void GarantirTabelaMovimentacoes()
+        public static void GarantirTabelaMovimentacoes()
+        {
+            GarantirEstruturaEstoque();
+        }
+
+        private static void GarantirEstruturaEstoque()
         {
             using var conn = new SqlConnection(connectionString);
             conn.Open();
-            using var cmd = new SqlCommand("IF OBJECT_ID(N'dbo.MovimentacoesEstoque', N'U') IS NULL CREATE TABLE MovimentacoesEstoque (id_movimentacao INT IDENTITY(1,1) PRIMARY KEY, produtoid INT NOT NULL, tipo_movimentacao VARCHAR(20) NOT NULL, quantidade INT NOT NULL, motivo VARCHAR(200) NOT NULL, data_movimentacao DATETIME NOT NULL, CONSTRAINT FK_Movimentacoes_Produtos FOREIGN KEY (produtoid) REFERENCES Produtos(id_produto));", conn);
+            using var cmd = new SqlCommand(@"
+                IF COL_LENGTH('dbo.Produtos', 'quantidade_estoque') IS NULL
+                    ALTER TABLE dbo.Produtos ADD quantidade_estoque INT NOT NULL CONSTRAINT DF_Produtos_quantidade DEFAULT 0;
+                IF COL_LENGTH('dbo.Produtos', 'codigo_barras') IS NULL
+                    ALTER TABLE dbo.Produtos ADD codigo_barras VARCHAR(50) NULL;
+                IF COL_LENGTH('dbo.Produtos', 'descricao') IS NULL
+                    ALTER TABLE dbo.Produtos ADD descricao VARCHAR(500) NULL;
+                IF COL_LENGTH('dbo.Produtos', 'ativo') IS NULL
+                    ALTER TABLE dbo.Produtos ADD ativo BIT NOT NULL CONSTRAINT DF_Produtos_ativo DEFAULT 1;
+                IF COL_LENGTH('dbo.Produtos', 'modified_at') IS NULL
+                    ALTER TABLE dbo.Produtos ADD modified_at DATETIME NOT NULL CONSTRAINT DF_Produtos_modified DEFAULT GETUTCDATE();
+                IF OBJECT_ID(N'dbo.MovimentacoesEstoque', N'U') IS NULL
+                    CREATE TABLE MovimentacoesEstoque (id_movimentacao INT IDENTITY(1,1) PRIMARY KEY, produtoid INT NOT NULL, tipo_movimentacao VARCHAR(20) NOT NULL, quantidade INT NOT NULL, motivo VARCHAR(200) NOT NULL, data_movimentacao DATETIME NOT NULL, CONSTRAINT FK_Movimentacoes_Produtos FOREIGN KEY (produtoid) REFERENCES Produtos(id_produto));
+                IF COL_LENGTH('dbo.MovimentacoesEstoque', 'modified_at') IS NULL
+                    ALTER TABLE dbo.MovimentacoesEstoque ADD modified_at DATETIME NOT NULL CONSTRAINT DF_Mov_modified DEFAULT GETUTCDATE();
+            ", conn);
             cmd.ExecuteNonQuery();
         }
 
@@ -458,8 +575,8 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ListarMesas", conn) { CommandType = CommandType.StoredProcedure };
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("sp_ListarMesas", conn) { CommandType = CommandType.StoredProcedure };
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -477,7 +594,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_AtualizarStatusMesa", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_AtualizarStatusMesa", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.Parameters.AddWithValue("@status", status);
                 cmd.ExecuteNonQuery();
@@ -488,14 +605,14 @@ namespace InfiniteCoffee2.Data
         // PEDIDOS
         // =========================
 
-        public static int CriarPedido(int mesaId, int funcionarioId, int clienteId)
+        public static int CriarPedido(int mesaId, int? funcionarioId, int clienteId)
         {
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_CriarPedido", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_CriarPedido", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@mesaId", mesaId);
-                cmd.Parameters.AddWithValue("@funcionarioId", funcionarioId);
+                cmd.Parameters.AddWithValue("@funcionarioId", funcionarioId.HasValue ? funcionarioId.Value : DBNull.Value);
                 cmd.Parameters.AddWithValue("@clienteId", clienteId);
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
@@ -506,7 +623,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_AdicionarItemPedido", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_AdicionarItemPedido", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
                 cmd.Parameters.AddWithValue("@produtoId", produtoId);
                 cmd.Parameters.AddWithValue("@quantidade", quantidade);
@@ -514,14 +631,52 @@ namespace InfiniteCoffee2.Data
             }
         }
 
+        public static List<Dictionary<string, object>> ListarItensPedido(int pedidoId)
+        {
+            var lista = new List<Dictionary<string, object>>();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT i.produtoid, p.nome_produto, SUM(i.quantidade) AS quantidade,
+                       i.preco_unitario, SUM(i.quantidade * i.preco_unitario) AS subtotal
+                FROM Itens_Pedidos i
+                INNER JOIN Produtos p ON p.id_produto = i.produtoid
+                WHERE i.pedidoid = @pedidoId
+                GROUP BY i.produtoid, p.nome_produto, i.preco_unitario
+                ORDER BY p.nome_produto", conn);
+            cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["produtoid"] = reader["produtoid"],
+                    ["nome_produto"] = reader["nome_produto"],
+                    ["quantidade"] = reader["quantidade"],
+                    ["preco_unitario"] = reader["preco_unitario"],
+                    ["subtotal"] = reader["subtotal"]
+                });
+            return lista;
+        }
+
+        public static void RemoverItemPedido(int pedidoId, int produtoId)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("DELETE FROM Itens_Pedidos WHERE pedidoid = @pedidoId AND produtoid = @produtoId", conn);
+            cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
+            cmd.Parameters.AddWithValue("@produtoId", produtoId);
+            cmd.ExecuteNonQuery();
+        }
+
         public static decimal CalcularTotalPedido(int pedidoId)
         {
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_CalcularTotalPedido", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_CalcularTotalPedido", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
-                return Convert.ToDecimal(cmd.ExecuteScalar());
+                var valor = cmd.ExecuteScalar();
+                return valor is null or DBNull ? 0m : Convert.ToDecimal(valor);
             }
         }
 
@@ -530,7 +685,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_RegistrarPagamento", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_RegistrarPagamento", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
                 cmd.Parameters.AddWithValue("@forma", forma);
                 cmd.Parameters.AddWithValue("@valor", valor);
@@ -543,9 +698,37 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_FinalizarPedido", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_FinalizarPedido", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
                 cmd.ExecuteNonQuery();
+            }
+        }
+
+        public static void CancelarAtendimento(int pedidoId, int mesaId)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction();
+            try
+            {
+                using var itens = new SqlCommand("DELETE FROM Itens_Pedidos WHERE pedidoid = @pedidoId", conn, transaction);
+                itens.Parameters.AddWithValue("@pedidoId", pedidoId);
+                itens.ExecuteNonQuery();
+
+                using var pedido = new SqlCommand("DELETE FROM Pedidos WHERE id_pedido = @pedidoId AND status_pedido = 'Aberto'", conn, transaction);
+                pedido.Parameters.AddWithValue("@pedidoId", pedidoId);
+                pedido.ExecuteNonQuery();
+
+                using var mesa = new SqlCommand("UPDATE Mesas SET status_mesa = 'Disponível' WHERE id_mesa = @mesaId AND status_mesa = 'Ocupada'", conn, transaction);
+                mesa.Parameters.AddWithValue("@mesaId", mesaId);
+                mesa.ExecuteNonQuery();
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
             }
         }
 
@@ -555,8 +738,8 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ListarPedidosAbertos", conn) { CommandType = CommandType.StoredProcedure };
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("sp_ListarPedidosAbertos", conn) { CommandType = CommandType.StoredProcedure };
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -578,8 +761,8 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ListarFuncionarios", conn) { CommandType = CommandType.StoredProcedure };
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("sp_ListarFuncionarios", conn) { CommandType = CommandType.StoredProcedure };
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -601,8 +784,8 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_PedidosDoDia", conn) { CommandType = CommandType.StoredProcedure };
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("sp_PedidosDoDia", conn) { CommandType = CommandType.StoredProcedure };
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -619,8 +802,8 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ProdutosMaisVendidos", conn) { CommandType = CommandType.StoredProcedure };
-                var reader = cmd.ExecuteReader();
+                using var cmd = new SqlCommand("sp_ProdutosMaisVendidos", conn) { CommandType = CommandType.StoredProcedure };
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -637,9 +820,9 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_HistoricoCliente", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_HistoricoCliente", conn) { CommandType = CommandType.StoredProcedure };
                 cmd.Parameters.AddWithValue("@clienteId", clienteId);
-                var reader = cmd.ExecuteReader();
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                     lista.Add(new Dictionary<string, object>
                     {
@@ -656,7 +839,7 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_Faturamento", conn) { CommandType = CommandType.StoredProcedure };
+                using var cmd = new SqlCommand("sp_Faturamento", conn) { CommandType = CommandType.StoredProcedure };
                 return Convert.ToDecimal(cmd.ExecuteScalar());
             }
         }

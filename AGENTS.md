@@ -11,6 +11,7 @@ Estas regras valem para todo trabalho neste repositorio.
 - A `CdmEdu` e a fonte oficial do HTML e do visual do sistema.
 - Somente a `CdmEdu` pode criar ou alterar HTML, Views Razor, CSS e componentes visuais; outras branches devem receber essas mudancas por merge.
 - Acesso ao SQL Server centralizado em `InfiniteCoffee2/Data/Banco.cs`.
+- Cada maquina pode usar um servidor SQL diferente; prefira `PADARIA_CONNECTION_STRING` e nunca versione uma conexao local especifica.
 - O banco usa procedures armazenadas e chaves estrangeiras para manter integridade.
 
 ## Regras de desenvolvimento

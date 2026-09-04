@@ -34,8 +34,7 @@ namespace InfiniteCoffee2.Controllers
 
         public IActionResult Editar(int id)
         {
-            var clientes = Banco.ListarClientes();
-            var cliente = clientes.FirstOrDefault(c => c["id_cliente"].ToString() == id.ToString());
+            var cliente = Banco.BuscarClientePorId(id);
             if (cliente == null) return NotFound();
             return View(cliente);
         }

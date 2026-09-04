@@ -13,7 +13,10 @@ class InventoryApi {
   static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const _apiToken = String.fromEnvironment('API_ACCESS_TOKEN');
   static const _writeToken = String.fromEnvironment('API_WRITE_TOKEN');
-  static const _localNetworkBaseUrl = 'http://192.168.1.101:5049';
+  static const _localNetworkBaseUrl = String.fromEnvironment(
+    'API_LOCAL_URL',
+    defaultValue: 'http://192.168.1.101:5049',
+  );
 
   Map<String, String> _headers([
     Map<String, String>? extra,
@@ -42,7 +45,7 @@ class InventoryApi {
     );
     final response = await _client
         .get(uri, headers: _headers())
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) {
       if (response.statusCode == 401 || response.statusCode == 403) {
         throw ApiException(
@@ -76,13 +79,16 @@ class InventoryApi {
             'motivo': reason,
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        '${body['mensagem'] ?? 'Nao foi possivel registrar a saida.'}',
-        response.statusCode,
-      );
+      String mensagem = 'Nao foi possivel registrar a saida.';
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        mensagem = body['mensagem'] ?? mensagem;
+      } catch (_) {
+        // Resposta nao e JSON valido (ex: pagina de erro HTML do IIS/Kestrel).
+      }
+      throw ApiException(mensagem, response.statusCode);
     }
   }
 
@@ -101,7 +107,7 @@ class InventoryApi {
             'motivo': reason,
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(
         'Nao foi possivel registrar a entrada.',
@@ -131,7 +137,7 @@ class InventoryApi {
             'quantidade': quantity,
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw const ApiException('Nao foi possivel cadastrar o produto.');
     }
@@ -140,13 +146,16 @@ class InventoryApi {
   Future<void> backup() async {
     final response = await _client
         .post(Uri.parse('$baseUrl/api/estoque/backup'))
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 15));
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        '${body['mensagem'] ?? 'Nao foi possivel enviar o backup.'}',
-        response.statusCode,
-      );
+      String mensagem = 'Nao foi possivel enviar o backup.';
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        mensagem = body['mensagem'] ?? mensagem;
+      } catch (_) {
+        // Resposta nao e JSON valido (ex: pagina de erro HTML do IIS/Kestrel).
+      }
+      throw ApiException(mensagem, response.statusCode);
     }
   }
 }

@@ -29,8 +29,7 @@ namespace InfiniteCoffee2.Controllers
 
         public IActionResult Editar(int id)
         {
-            var produtos = Banco.ListarProdutos();
-            var produto = produtos.FirstOrDefault(p => p["id_produto"].ToString() == id.ToString());
+            var produto = Banco.BuscarProdutoPorId(id);
             if (produto == null) return NotFound();
             return View(produto);
         }
@@ -43,6 +42,8 @@ namespace InfiniteCoffee2.Controllers
             return RedirectToAction("Index");
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Excluir(int id)
         {
             Banco.ExcluirProduto(id);

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/product.dart';
@@ -56,6 +57,9 @@ class InventoryRepository {
     required int quantity,
     required String reason,
   }) async {
+    if (quantity < 1) {
+      return const ExitResult(false, 'Informe uma quantidade valida.');
+    }
     if (quantity > product.quantity) {
       return const ExitResult(false, 'Estoque insuficiente.');
     }
@@ -149,7 +153,8 @@ class InventoryRepository {
         quantity: quantity,
       );
       return const ExitResult(true, 'Produto cadastrado com sucesso.');
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[CreateProduct] Falha ao cadastrar produto "$name": $error');
       return const ExitResult(
         false,
         'Cadastros de produtos exigem conexão com o servidor.',
@@ -160,27 +165,46 @@ class InventoryRepository {
   Future<void> _syncPending() async {
     final preferences = await SharedPreferences.getInstance();
     final pending = preferences.getStringList(_pendingKey) ?? [];
+    if (pending.isEmpty) return;
+
     final remaining = <String>[];
-    for (final item in pending) {
-      final data = jsonDecode(item) as Map<String, dynamic>;
-      try {
-        if (data['tipo'] == 'entrada') {
-          await _api.registerEntry(
-            productId: data['produtoId'],
-            quantity: data['quantidade'],
-            reason: data['motivo'],
+    const maxConcurrent = 5;
+
+    // Processa em blocos de maxConcurrent para evitar sobrecarga de conexoes.
+    for (var i = 0; i < pending.length; i += maxConcurrent) {
+      final batch = pending.sublist(
+        i,
+        i + maxConcurrent > pending.length ? pending.length : i + maxConcurrent,
+      );
+      final futures = batch.map((item) async {
+        final data = jsonDecode(item) as Map<String, dynamic>;
+        try {
+          if (data['tipo'] == 'entrada') {
+            await _api.registerEntry(
+              productId: data['produtoId'],
+              quantity: data['quantidade'],
+              reason: data['motivo'],
+            );
+          } else {
+            await _api.registerExit(
+              productId: data['produtoId'],
+              quantity: data['quantidade'],
+              reason: data['motivo'],
+            );
+          }
+        } catch (error) {
+          debugPrint(
+            '[SyncPending] Falha ao sincronizar '
+            '${data['tipo'] ?? '?'} '
+            'produtoId=${data['produtoId'] ?? '?'}: '
+            '$error',
           );
-        } else {
-          await _api.registerExit(
-            productId: data['produtoId'],
-            quantity: data['quantidade'],
-            reason: data['motivo'],
-          );
+          remaining.add(item);
         }
-      } catch (_) {
-        remaining.add(item);
-      }
+      });
+      await Future.wait(futures);
     }
+
     await preferences.setStringList(_pendingKey, remaining);
   }
 

@@ -27,6 +27,7 @@
     }
 </div>
 
+<div class="table-responsive">
 <table class="table table-striped">
     <thead>
         <tr>
@@ -48,6 +49,7 @@
                 <td>
                     <a href="/Cliente/Editar/@c["id_cliente"]" class="btn btn-sm btn-warning">Editar</a>
                     <form method="post" action="/Cliente/Excluir/@c["id_cliente"]" class="d-inline">
+                        @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-sm btn-danger"
                                 onclick="return confirm('Confirmar exclusão?')">Excluir</button>
                     </form>
@@ -56,3 +58,4 @@
         }
     </tbody>
 </table>
+</div>

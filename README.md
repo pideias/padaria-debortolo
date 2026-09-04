@@ -13,7 +13,7 @@ Os incertes que eu coloquei são apenas para testar, voce pode adicionar os ince
 
 - .NET 10 SDK instalado.
 - SQL Server em execução com o banco `infiniteCoffee` criado.
-- Servidor configurado na string de conexão de `InfiniteCoffee2/Data/Banco.cs`.
+- SQL Server configurado por `PADARIA_CONNECTION_STRING` ou pela conexão padrão local.
 
 Para restaurar, compilar e iniciar:
 
@@ -24,15 +24,25 @@ dotnet run --project InfiniteCoffee2/InfiniteCoffee2.csproj
 ```
 
 
-## IMPORTANTE
+## Conexao do banco
 
-No C#, a classe `Banco` usa o SQL Server local:
+O projeto usa `localhost` como padrao para a instancia local do SQL Server. Cada colaborador
+que usa outro servidor ou instancia deve configurar a propria variavel de ambiente, sem alterar
+o arquivo versionado:
 
-private static string connectionString =
-    "Server=localhost\\KAIO;Database=infiniteCoffee;Trusted_Connection=True;TrustServerCertificate=True;";
+```powershell
+$env:PADARIA_CONNECTION_STRING="Server=SEU_SERVIDOR;Database=infiniteCoffee;Trusted_Connection=True;TrustServerCertificate=True;"
+dotnet run --project InfiniteCoffee2/InfiniteCoffee2.csproj
+```
 
-Se o seu servidor tiver outro nome, mude apenas `Server=localhost\\KAIO` para `Server=NOME_DO_SERVIDOR`.
-Voce pode pegar o Nome do Servidor assim que abrir o SQL server, na aba que abre, voce copia o Nome do Servidor e cola.
+Exemplo para uma instancia nomeada:
+
+```powershell
+$env:PADARIA_CONNECTION_STRING="Server=localhost\KAIO;Database=infiniteCoffee;Trusted_Connection=True;TrustServerCertificate=True;"
+```
+
+O `Program.cs` prioriza `PADARIA_CONNECTION_STRING` e usa `ConnectionStrings:DefaultConnection`
+apenas quando a variavel nao estiver definida.
 
 ------ Esse é o banco de dados ------
 

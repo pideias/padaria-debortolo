@@ -1,47 +1,91 @@
-@{ ViewBag.Title = "Adicionar Itens"; }
+@{
+    ViewBag.Title = "Cardápio";
+    var itensPedido = (List<Dictionary<string, object>>)ViewBag.ItensPedido;
+}
 
-<h2>Novo Atendimento</h2>
-<p class="text-muted">Etapa 4 de 4 — Adicionar Itens ao Pedido #@ViewBag.PedidoId</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2>Novo Atendimento</h2>
+        <p class="text-muted mb-0">Etapa 4 de 4 — Monte seu pedido</p>
+    </div>
+    <span class="badge bg-warning">Pedido #@ViewBag.PedidoId</span>
+</div>
 
 @if (TempData["Mensagem"] != null)
 {
-    <div class="alert alert-success">@TempData["Mensagem"]</div>
+    <div class="alert alert-info">@TempData["Mensagem"]</div>
 }
 
-<div class="row">
-    <div class="col-md-8">
-        <form method="post" action="/Atendimento/AdicionarItem">
-            <table class="table table-striped">
-                <thead><tr><th>ID</th><th>Produto</th><th>Preço</th><th>Tipo</th><th>Qtd</th><th></th></tr></thead>
-                <tbody>
-                    @foreach (var p in (List<Dictionary<string, object>>)ViewBag.Produtos)
-                    {
-                        <tr>
-                            <td>@p["id_produto"]</td>
-                            <td>@p["nome_produto"]</td>
-                            <td>R$ @p["preco"]</td>
-                            <td>@p["tipo"]</td>
-                            <td>
-                                <form method="post" action="/Atendimento/AdicionarItem" class="d-flex gap-1">
-                                    <input type="hidden" name="produtoId" value="@p["id_produto"]" />
-                                    <input type="number" name="quantidade" value="1" min="1" class="form-control form-control-sm" style="width:70px" />
-                                    <button type="submit" class="btn btn-sm btn-primary">+ Add</button>
-                                </form>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </form>
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <p class="eyebrow mb-1">feito na hora</p>
+                    <h3 class="mb-0">Cardápio</h3>
+                </div>
+                <span class="text-muted">Escolha seus favoritos</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr><th>Produto</th><th>Tipo</th><th>Preço</th><th>Quantidade</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in (List<Dictionary<string, object>>)ViewBag.Produtos)
+                        {
+                            <tr>
+                                <td><strong>@p["nome_produto"]</strong></td>
+                                <td>@p["tipo"]</td>
+                                <td>R$ @p["preco"]</td>
+                                <td>
+                                    <form method="post" action="/Atendimento/AdicionarItem" class="d-flex gap-2 align-items-center">
+                                        <input type="hidden" name="produtoId" value="@p["id_produto"]" />
+                                        <input type="number" name="quantidade" value="1" min="1" class="form-control form-control-sm" style="width: 70px" aria-label="Quantidade de @p["nome_produto"]" />
+                                        <button type="submit" class="btn btn-sm btn-primary">Adicionar</button>
+                                    </form>
+                                </td>
+                                <td></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>Pedido #@ViewBag.PedidoId</h5>
-            <p class="text-muted">Adicione os itens à esquerda.</p>
-            <a href="/Atendimento/Pagamento" class="btn btn-success w-100">
-                Ir para Pagamento →
-            </a>
+    <div class="col-lg-4">
+        <div class="card p-4 order-summary">
+            <p class="eyebrow mb-1">seu pedido</p>
+            <h3>Resumo</h3>
+            @if (itensPedido.Count == 0)
+            {
+                <p class="text-muted">Seu pedido ainda está vazio.</p>
+            }
+            else
+            {
+                foreach (var item in itensPedido)
+                {
+                    <div class="d-flex justify-content-between align-items-start gap-2 border-bottom py-2">
+                        <div><strong>@item["nome_produto"]</strong><br /><small class="text-muted">@item["quantidade"] x R$ @item["preco_unitario"]</small></div>
+                        <div class="text-end"><strong>R$ @item["subtotal"]</strong><form method="post" action="/Atendimento/RemoverItem"><input type="hidden" name="produtoId" value="@item["produtoid"]" /><button type="submit" class="btn btn-link btn-sm p-0 text-danger">Remover</button></form></div>
+                    </div>
+                }
+            }
+            <div class="d-flex justify-content-between align-items-center mt-3 mb-3"><span>Total</span><strong class="fs-4 text-success">R$ @ViewBag.Total</strong></div>
+            <a href="/Atendimento/Pagamento" class="btn btn-success w-100 @(itensPedido.Count == 0 ? "disabled" : "")">Revisar e ir para pagamento</a>
+            <form method="post" action="/Atendimento/Cancelar" class="mt-2 atendimento-navigation-form"><button type="submit" class="btn btn-outline-secondary w-100">Cancelar atendimento</button></form>
         </div>
     </div>
 </div>
+
+<script>
+    (() => {
+        let navegando = false;
+        document.addEventListener('click', event => { if (event.target.closest('a')) navegando = true; });
+        document.addEventListener('submit', () => { navegando = true; });
+        window.addEventListener('pagehide', () => {
+            if (!navegando && navigator.sendBeacon) navigator.sendBeacon('/Atendimento/Cancelar');
+        });
+    })();
+</script>

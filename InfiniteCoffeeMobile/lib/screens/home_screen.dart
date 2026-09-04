@@ -15,7 +15,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String _search = '';
   final Map<int, CartLine> _cart = {};
@@ -26,11 +26,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _stock = widget.repository.load();
-    _refreshTimer = Timer.periodic(
-      const Duration(minutes: 30),
-      (_) => _reload(_search),
-    );
+    _startRefreshTimer();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
     ) {
@@ -41,8 +39,26 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(
+      const Duration(minutes: 30),
+      (_) => _reload(_search),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _startRefreshTimer();
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     _connectivitySubscription?.cancel();
     super.dispose();
@@ -192,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _sendToDrive() async {
-    await _runSync('Alteracoes enviadas para o Google Drive.');
+    await _runSync('Sincronizacao concluida.');
   }
 
   Future<void> _backupNow() async {
@@ -219,8 +235,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _runSync(String successMessage) async {
-    setState(() => _stock = widget.repository.syncNow(search: _search));
-    final result = await _stock;
+    final future = widget.repository.syncNow(search: _search);
+    setState(() => _stock = future);
+    final result = await future;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -369,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 barcode: barcode.text,
                 type: type.text,
                 price: double.tryParse(price.text.replaceAll(',', '.')) ?? 0,
-                quantity: int.tryParse(quantity.text) ?? -1,
+                quantity: int.tryParse(quantity.text) ?? 0,
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context)
@@ -856,6 +873,18 @@ class _SaleViewState extends State<_SaleView> {
   String _payment = 'Pix';
 
   @override
+  void initState() {
+    super.initState();
+    _customer.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _customer.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final total = widget.cart.fold<double>(
       0,
@@ -888,7 +917,6 @@ class _SaleViewState extends State<_SaleView> {
                 ),
                 TextField(
                   controller: _customer,
-                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(labelText: 'Cliente'),
                   textInputAction: TextInputAction.next,
                 ),
@@ -912,6 +940,7 @@ class _SaleViewState extends State<_SaleView> {
                 if (widget.cart.isNotEmpty)
                   ...widget.cart.map(
                     (line) => Row(
+                      key: ValueKey(line.product.id),
                       children: [
                         Expanded(
                           child: Text('${line.quantity}x ${line.product.name}'),

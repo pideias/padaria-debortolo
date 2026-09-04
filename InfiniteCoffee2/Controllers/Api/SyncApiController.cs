@@ -63,8 +63,9 @@ public sealed class SyncApiController : ControllerBase
                 if (ok) aceitos.Add(op.ClientUuid);
                 else rejeitados.Add(op.ClientUuid);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Trace.TraceError($"[Sync.Push] Erro ao processar operação {op.ClientUuid}: {ex}");
                 rejeitados.Add(op.ClientUuid);
             }
         }

@@ -1,4 +1,4 @@
-@* Index.cshtml - Etapa 1: Cliente *@
+@* Index.cshtml - Etapa 1: Identificacao do cliente *@
 @{ ViewBag.Title = "Novo Atendimento"; }
 
 <h2>Novo Atendimento</h2>
@@ -9,47 +9,18 @@
     <div class="alert alert-info">@TempData["Mensagem"]</div>
 }
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card p-3 mb-3">
-            <h5>Cliente existente</h5>
-            <table class="table table-sm">
-                <thead><tr><th>ID</th><th>Nome</th><th>Email</th><th></th></tr></thead>
-                <tbody>
-                    @foreach (var c in (List<Dictionary<string, object>>)ViewBag.Clientes)
-                    {
-                        <tr>
-                            <td>@c["id_cliente"]</td>
-                            <td>@c["nome_cliente"]</td>
-                            <td>@c["email"]</td>
-                            <td>
-                                <form method="post" action="/Atendimento/SelecionarCliente">
-                                    <input type="hidden" name="clienteId" value="@c["id_cliente"]" />
-                                    <button type="submit" class="btn btn-sm btn-success">Selecionar</button>
-                                </form>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+<div class="card p-4" style="max-width: 620px;">
+    <h5>Identificação do cliente</h5>
+    <p class="text-muted">Informe nome e email. Se já houver cadastro, ele será localizado automaticamente.</p>
+    <form method="post" action="/Atendimento/CadastrarCliente">
+        <div class="mb-3">
+            <label class="form-label" for="nome">Nome</label>
+            <input type="text" id="nome" name="nome" class="form-control" placeholder="Seu nome" maxlength="100" required />
         </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card p-3">
-            <h5>Cadastrar novo cliente</h5>
-            <form method="post" action="/Atendimento/CadastrarCliente">
-                <div class="mb-2">
-                    <input type="text" name="nome" class="form-control" placeholder="Nome" required />
-                </div>
-                <div class="mb-2">
-                    <input type="email" name="email" class="form-control" placeholder="Email" />
-                </div>
-                <div class="mb-2">
-                    <input type="text" name="telefone" class="form-control" placeholder="Telefone" />
-                </div>
-                <button type="submit" class="btn btn-primary">Cadastrar e Continuar</button>
-            </form>
+        <div class="mb-3">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" name="email" class="form-control" placeholder="voce@email.com" maxlength="100" required />
         </div>
-    </div>
+        <button type="submit" class="btn btn-primary">Continuar para escolher a mesa</button>
+    </form>
 </div>
