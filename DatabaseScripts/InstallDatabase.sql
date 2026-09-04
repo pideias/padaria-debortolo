@@ -1,5 +1,10 @@
--- Instalacao inicial idempotente do banco local.
+-- Instalacao inicial idempotente do banco.
 -- Nao remove dados existentes.
+IF DB_ID(N'infiniteCoffee') IS NULL
+    CREATE DATABASE infiniteCoffee;
+GO
+USE infiniteCoffee;
+GO
 IF OBJECT_ID('dbo.Produtos', 'U') IS NULL
     CREATE TABLE Produtos (id_produto INT IDENTITY(1,1) PRIMARY KEY, nome_produto VARCHAR(100) NOT NULL, preco DECIMAL(10,2) NOT NULL, tipo VARCHAR(50) NOT NULL, quantidade_estoque INT NOT NULL DEFAULT 0, codigo_barras VARCHAR(50) NULL, descricao VARCHAR(500) NULL, ativo BIT NOT NULL DEFAULT 1, modified_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME());
 IF OBJECT_ID('dbo.Clientes', 'U') IS NULL
@@ -23,23 +28,43 @@ IF NOT EXISTS (SELECT 1 FROM Funcionarios) INSERT INTO Funcionarios (nome_funcio
 IF NOT EXISTS (SELECT 1 FROM Clientes) INSERT INTO Clientes (nome_cliente, email, telefone) VALUES ('Cliente demonstracao', 'cliente@infinitecoffee.com', '(00) 00000-0000');
 IF NOT EXISTS (SELECT 1 FROM Mesas) INSERT INTO Mesas (numero, capacidade, status_mesa) VALUES (1, 4, 'Disponivel'), (2, 4, 'Disponivel'), (3, 6, 'Disponivel');
 IF NOT EXISTS (SELECT 1 FROM Produtos) INSERT INTO Produtos (nome_produto, preco, tipo, quantidade_estoque) VALUES ('Cafe Expresso', 6.00, 'Bebida', 20), ('Cafe com Leite', 8.00, 'Bebida', 20), ('Pao de Queijo', 5.00, 'Prato', 30);
+GO
 
 CREATE OR ALTER PROCEDURE sp_ListarClientes AS SELECT * FROM Clientes;
+GO
 CREATE OR ALTER PROCEDURE sp_BuscarCliente @valor VARCHAR(100) AS SELECT * FROM Clientes WHERE nome_cliente LIKE '%' + @valor + '%' OR email LIKE '%' + @valor + '%';
+GO
 CREATE OR ALTER PROCEDURE sp_CadastrarCliente @nome VARCHAR(100), @email VARCHAR(100), @telefone VARCHAR(20) AS INSERT INTO Clientes (nome_cliente, email, telefone) VALUES (@nome, @email, @telefone);
+GO
 CREATE OR ALTER PROCEDURE sp_AtualizarCliente @id INT, @nome VARCHAR(100), @email VARCHAR(100), @telefone VARCHAR(20) AS UPDATE Clientes SET nome_cliente=@nome, email=@email, telefone=@telefone WHERE id_cliente=@id;
+GO
 CREATE OR ALTER PROCEDURE sp_ListarFuncionarios AS SELECT * FROM Funcionarios;
+GO
 CREATE OR ALTER PROCEDURE sp_ListarMesas AS SELECT * FROM Mesas;
+GO
 CREATE OR ALTER PROCEDURE sp_ListarMesasLivres AS SELECT * FROM Mesas WHERE status_mesa IN ('Livre', 'Disponivel');
+GO
 CREATE OR ALTER PROCEDURE sp_AtualizarStatusMesa @id INT, @status VARCHAR(60) AS UPDATE Mesas SET status_mesa=@status WHERE id_mesa=@id;
+GO
 CREATE OR ALTER PROCEDURE sp_CriarPedido @mesaId INT, @funcionarioId INT, @clienteId INT AS INSERT INTO Pedidos (mesaid, funcionarioid, clienteid, datahora, status_pedido) VALUES (@mesaId,@funcionarioId,@clienteId,GETDATE(),'Aberto'); SELECT SCOPE_IDENTITY() AS id_pedido;
+GO
 CREATE OR ALTER PROCEDURE sp_AdicionarItemPedido @pedidoId INT, @produtoId INT, @quantidade INT AS INSERT INTO Itens_Pedidos (pedidoid, produtoid, quantidade, preco_unitario) SELECT @pedidoId,@produtoId,@quantidade,preco FROM Produtos WHERE id_produto=@produtoId;
+GO
 CREATE OR ALTER PROCEDURE sp_CalcularTotalPedido @pedidoId INT AS SELECT SUM(quantidade * preco_unitario) AS total FROM Itens_Pedidos WHERE pedidoid=@pedidoId;
+GO
 CREATE OR ALTER PROCEDURE sp_RegistrarPagamento @pedidoId INT, @forma VARCHAR(50), @valor DECIMAL(10,2) AS INSERT INTO Pagamentos (pedidoid, forma_pagamento, valor_total) VALUES (@pedidoId,@forma,@valor);
+GO
 CREATE OR ALTER PROCEDURE sp_FinalizarPedido @pedidoId INT AS UPDATE Pedidos SET status_pedido='Finalizado' WHERE id_pedido=@pedidoId;
+GO
 CREATE OR ALTER PROCEDURE sp_ListarPedidosAbertos AS SELECT * FROM Pedidos WHERE status_pedido='Aberto';
+GO
 CREATE OR ALTER PROCEDURE sp_PedidosDoDia AS SELECT * FROM Pedidos WHERE CAST(datahora AS DATE)=CAST(GETDATE() AS DATE);
+GO
 CREATE OR ALTER PROCEDURE sp_ProdutosMaisVendidos AS SELECT p.nome_produto,SUM(i.quantidade) AS total_vendido FROM Itens_Pedidos i JOIN Produtos p ON i.produtoid=p.id_produto GROUP BY p.nome_produto ORDER BY total_vendido DESC;
+GO
 CREATE OR ALTER PROCEDURE sp_HistoricoCliente @clienteId INT AS SELECT * FROM Pedidos WHERE clienteid=@clienteId;
+GO
 CREATE OR ALTER PROCEDURE sp_Faturamento AS SELECT ISNULL(SUM(valor_total),0) AS faturamento_total FROM Pagamentos;
+GO
 CREATE OR ALTER PROCEDURE sp_AtualizarProduto @id INT, @nome VARCHAR(100), @preco DECIMAL(10,2), @tipo VARCHAR(50) AS UPDATE Produtos SET nome_produto=@nome, preco=@preco, tipo=@tipo, modified_at=SYSUTCDATETIME() WHERE id_produto=@id;
+GO
