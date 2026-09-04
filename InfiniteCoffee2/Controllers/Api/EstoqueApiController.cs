@@ -42,10 +42,10 @@ public sealed class EstoqueApiController : ControllerBase
     public async Task<IActionResult> Backup()
     {
         if (IsSnapshotOnly())
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensagem = "O backup deve ser executado pela API local que acessa o SQL Server." });
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensagem = "O backup deve ser executado pela API central que acessa o SQL Server." });
         return await _snapshotPublisher.PublicarAgoraAsync()
             ? Ok(new { mensagem = "Backup enviado para o Google Drive." })
-            : StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensagem = "Configure o acesso OAuth do Google Drive no desktop." });
+            : StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensagem = "Configure GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON e GOOGLE_DRIVE_FOLDER_ID no servidor." });
     }
 
     /// <summary>Retorna uma fotografia versionada do estoque para clientes de consulta.</summary>

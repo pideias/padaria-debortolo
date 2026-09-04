@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
@@ -10,18 +9,15 @@ class InventoryApi {
   InventoryApi({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const _configuredBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://padaria-debortolo-api-8v6w.onrender.com',
+  );
   static const _configuredWriteBaseUrl = String.fromEnvironment(
     'API_WRITE_BASE_URL',
   );
   static const _apiToken = String.fromEnvironment('API_ACCESS_TOKEN');
   static const _writeToken = String.fromEnvironment('API_WRITE_TOKEN');
-  static const _localNetworkBaseUrl = String.fromEnvironment(
-    'API_LOCAL_URL',
-    defaultValue: 'http://192.168.1.101:5049',
-  );
-  static const _localDesktopBaseUrl = 'http://127.0.0.1:5049';
-
   Map<String, String> _headers([
     Map<String, String>? extra,
     bool write = false,
@@ -32,17 +28,9 @@ class InventoryApi {
     return {if (token.trim().isNotEmpty) 'X-Api-Key': token, ...?extra};
   }
 
-  // API_BASE_URL permite apontar para o backend local durante o desenvolvimento.
+  // API_BASE_URL pode apontar para um backend local somente em desenvolvimento.
   String get baseUrl {
-    if (_configuredBaseUrl.trim().isNotEmpty) {
-      return _configuredBaseUrl.replaceFirst(RegExp(r'/$'), '');
-    }
-    // Use IPv4 on desktop to avoid localhost resolving to ::1 while the API
-    // is listening only on 0.0.0.0.
-    if (kIsWeb) return _localDesktopBaseUrl;
-    return defaultTargetPlatform == TargetPlatform.android
-        ? _localNetworkBaseUrl
-        : _localDesktopBaseUrl;
+    return _configuredBaseUrl.replaceFirst(RegExp(r'/$'), '');
   }
 
   // Escritas e backup precisam chegar ao servidor que acessa o SQL Server.
@@ -50,9 +38,7 @@ class InventoryApi {
     if (_configuredWriteBaseUrl.trim().isNotEmpty) {
       return _configuredWriteBaseUrl.replaceFirst(RegExp(r'/$'), '');
     }
-    return defaultTargetPlatform == TargetPlatform.windows
-        ? _localDesktopBaseUrl
-        : baseUrl;
+    return baseUrl;
   }
 
   Future<List<Product>> getStock({String search = ''}) async {

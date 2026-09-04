@@ -16,6 +16,8 @@ IF OBJECT_ID('dbo.Pagamentos', 'U') IS NULL
     CREATE TABLE Pagamentos (id_pagamento INT IDENTITY(1,1) PRIMARY KEY, pedidoid INT NOT NULL REFERENCES Pedidos(id_pedido), forma_pagamento VARCHAR(100) NOT NULL, valor_total DECIMAL(10,2) NOT NULL);
 IF OBJECT_ID('dbo.MovimentacoesEstoque', 'U') IS NULL
     CREATE TABLE MovimentacoesEstoque (id_movimentacao INT IDENTITY(1,1) PRIMARY KEY, produtoid INT NOT NULL REFERENCES Produtos(id_produto), tipo_movimentacao VARCHAR(20) NOT NULL, quantidade INT NOT NULL, motivo VARCHAR(200) NOT NULL, data_movimentacao DATETIME NOT NULL, modified_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME());
+IF OBJECT_ID('dbo.SyncOperations', 'U') IS NULL
+    CREATE TABLE SyncOperations (client_uuid VARCHAR(100) NOT NULL PRIMARY KEY, tipo VARCHAR(30) NOT NULL, created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME());
 
 IF NOT EXISTS (SELECT 1 FROM Funcionarios) INSERT INTO Funcionarios (nome_funcionario, cargo) VALUES ('Sarah Lopes', 'Dona'), ('Jean Reis', 'Caixa'), ('Julia Lopes', 'Garconete');
 IF NOT EXISTS (SELECT 1 FROM Clientes) INSERT INTO Clientes (nome_cliente, email, telefone) VALUES ('Cliente demonstracao', 'cliente@infinitecoffee.com', '(00) 00000-0000');

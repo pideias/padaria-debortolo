@@ -32,12 +32,13 @@ public sealed class SyncApiController : ControllerBase
 
     /// <summary>
     /// Push: aplica operacoes feitas offline (saida, entrada, venda) em lote.
-    /// O clientUuid identifica a operacao; a deduplicacao persistente ainda deve ser adicionada
-    /// antes de considerar o endpoint totalmente idempotente em producao.
+    /// O clientUuid identifica a operacao e e persistido para impedir reenvio duplicado.
     /// </summary>
     [HttpPost("push")]
     public IActionResult Push([FromBody] PushSyncRequest request)
     {
+        if (request?.Operacoes is null || request.Operacoes.Count == 0 || request.Operacoes.Count > 100)
+            return BadRequest(new { mensagem = "Envie entre 1 e 100 operações." });
         var aceitos = new List<string>();
         var rejeitados = new List<string>();
 
@@ -45,6 +46,16 @@ public sealed class SyncApiController : ControllerBase
         // quais itens do lote foram aceitos ou precisam permanecer na fila local.
         foreach (var op in request.Operacoes)
         {
+            if (string.IsNullOrWhiteSpace(op.ClientUuid) || op.ClientUuid.Length > 100 || string.IsNullOrWhiteSpace(op.Tipo))
+            {
+                rejeitados.Add(op.ClientUuid);
+                continue;
+            }
+            if (!Banco.ClaimSyncOperation(op.ClientUuid, op.Tipo))
+            {
+                aceitos.Add(op.ClientUuid);
+                continue;
+            }
             try
             {
                 var ok = op.Tipo switch
@@ -61,10 +72,15 @@ public sealed class SyncApiController : ControllerBase
                 };
 
                 if (ok) aceitos.Add(op.ClientUuid);
-                else rejeitados.Add(op.ClientUuid);
+                else
+                {
+                    Banco.ReleaseSyncOperation(op.ClientUuid);
+                    rejeitados.Add(op.ClientUuid);
+                }
             }
             catch
             {
+                Banco.ReleaseSyncOperation(op.ClientUuid);
                 rejeitados.Add(op.ClientUuid);
             }
         }

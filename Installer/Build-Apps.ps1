@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ApiBaseUrl = 'http://192.168.1.101:5049',
+    [string]$ApiBaseUrl = 'https://padaria-debortolo-api-8v6w.onrender.com',
     [switch]$SkipWindows,
     [switch]$SkipAndroid
 )
@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $mobile = Join-Path $root 'InfiniteCoffeeMobile'
 $mobileDefines = @("--dart-define=API_BASE_URL=$ApiBaseUrl")
-$desktopDefines = @('--dart-define=API_BASE_URL=http://localhost:5049')
+$desktopDefines = @("--dart-define=API_BASE_URL=$ApiBaseUrl")
 
 $readOnlyToken = $env:PADARIA_READONLY_TOKEN
 $writeToken = $env:PADARIA_MOBILE_WRITE_TOKEN

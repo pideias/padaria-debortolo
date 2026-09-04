@@ -29,7 +29,7 @@ Windows .exe / Android .apk / Flutter Web
              |
              | HTTP REST
              v
-ASP.NET Core em http://localhost:5049
+ASP.NET Core publicado no Render
              |
              v
 SQL Server infiniteCoffee (fonte da verdade)
@@ -39,10 +39,8 @@ SQL Server infiniteCoffee (fonte da verdade)
 - No app, o Hive e o espelho offline local; ele nao substitui o SQL Server.
 - O app nao conversa diretamente com outro dispositivo. Windows e celular conversam
   entre si por meio da API e do SQL Server.
-- Windows no mesmo computador usa `http://localhost:5049`.
-- Android usa a API publicada no Render por padrao; para desenvolvimento local,
-  compile informando `API_BASE_URL=http://10.0.2.2:5049` no emulador.
-- Celular fisico deve usar o IP LAN do computador, por exemplo `http://192.168.1.10:5049`.
+- Windows e Android usam `https://padaria-debortolo-api-8v6w.onrender.com` por padrao.
+- Para desenvolvimento local, compile informando `API_BASE_URL` com a URL local desejada.
 
 ## Fluxo de inicializacao do Flutter
 
@@ -186,28 +184,24 @@ flutter run -d emulator-5554
 - Os tokens continuam aceitos por compatibilidade, mas nao sao obrigatorios enquanto a API
   demonstrativa estiver publica. APKs novos podem ser compilados sem `API_ACCESS_TOKEN` e
   `API_WRITE_TOKEN`.
-- O cliente mobile desta instalacao usa a API local da padaria em `http://192.168.1.101:5049`,
-  enquanto o desktop usa `http://localhost:5049`. Se o IP do computador mudar, compile o
-  APK com `API_BASE_URL=http://IP_DO_PC:5049`. O cliente aguarda ate 60 segundos para
-  permitir o despertar da instancia gratuita e exibe erro de autenticacao separado de erro
-  real de conexao.
+- O cliente mobile e o desktop usam por padrao `https://padaria-debortolo-api-8v6w.onrender.com`
+  para leitura e escrita. Para desenvolvimento local, compile explicitamente com
+  `API_BASE_URL` e `API_WRITE_BASE_URL` apontando para a API local. O cliente aguarda ate 60
+  segundos para permitir o despertar da instancia gratuita.
 - No modo demonstrativo, o mobile mantém uma cópia local persistente dos produtos, atualiza
   o saldo imediatamente após entrada/saída e mantém operações pendentes para sincronização
   posterior pela API. O Google Drive recebe somente uma cópia do SQL Server.
-- O Render em `PADARIA_SNAPSHOT_ONLY=true` e somente consulta. Entradas e saídas devem ser
-  enviadas a uma API com acesso ao SQL Server; o arquivo do Google Drive nunca e a fonte de
-  escrita.
-- O desktop publica o snapshot do SQL Server no Drive a cada 30 minutos. O mobile recarrega
-  o estoque e tenta enviar a fila local no mesmo intervalo.
-- O atalho instalado usa `Installer/Start-PadariaDesktop.cmd`, que inicia o backend local em
-  `http://0.0.0.0:5049` e abre o aplicativo desktop juntos. Assim o funcionamento normal
-  do desktop nao depende do Render nem de internet. A instalacao libera a porta 5049 somente
-  no perfil de rede privada. Para o APK acessar o PC pela LAN, compile-o com
-  `API_BASE_URL=http://IP_DO_PC:5049`.
+- O Render em `PADARIA_SNAPSHOT_ONLY=false` e a API central de leitura e escrita. O arquivo
+  do Google Drive nunca e a fonte de escrita.
+- A API central publica o snapshot do SQL Server no Drive a cada 30 minutos. O mobile e o
+  desktop chamam `POST /api/estoque/backup`; nenhuma credencial do Google Drive e distribuida
+  nos aplicativos.
+- O desktop e o APK usam por padrao a API central no Render. O backend local continua
+  disponivel somente para desenvolvimento, mediante `API_BASE_URL` explicito.
 - Para compilar APK e Windows automaticamente, use `Installer/Build-Apps.ps1`. O script lê
   `PADARIA_READONLY_TOKEN` e `PADARIA_MOBILE_WRITE_TOKEN` do ambiente apenas quando elas
-  existirem e nunca salva esses valores no repositorio. O APK usa o IP da LAN informado e o
-  Windows usa `http://localhost:5049`, para trabalhar diretamente com o SQL Server local.
+  existirem e nunca salva esses valores no repositorio. Os dois aplicativos usam a URL do
+  Render por padrao.
 
 ## Limitacoes e proximos cuidados
 
@@ -219,3 +213,17 @@ flutter run -d emulator-5554
   outros dispositivos que ja tenham o cache; atualmente o dispositivo que executa a exclusao
   remove o item localmente.
 - O APK exige Android SDK, NDK e uma imagem de emulador instalados.
+
+## Integracao centralizada
+
+- `POST /api/sync/push` persiste cada `clientUuid` em `SyncOperations`; reenvios da mesma
+  operacao sao tratados como aceitos sem repetir a baixa ou a venda.
+- O pull inclui produtos inativados com `ativo = 0` como tombstones, permitindo que os
+  caches removam o item sem apagar o historico no SQL Server.
+- O PDV envia uma venda unica para `/api/vendas`, deixando o servidor calcular o total e
+  executar pedido, itens, pagamento e baixa na mesma transacao.
+- O Render deve executar a API central com `PADARIA_SNAPSHOT_ONLY=false`, receber a string
+  de conexao por segredo (`PADARIA_CONNECTION_STRING`) e o JSON completo da conta de serviço em
+  `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`. Compartilhe a pasta do Drive com o e-mail da conta de
+  serviço. O Google Drive continua somente como destino de backup/snapshot e é acessado apenas
+  pelo backend via API.

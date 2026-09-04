@@ -89,7 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSync: _syncNow,
                 onBackup: _backupNow,
               )
-            : _SaleView(
+            : _selectedIndex == 3
+            ? _SaleView(
                 products: data.products,
                 search: _search,
                 onSearch: _reload,
@@ -97,7 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onAdd: _addToCart,
                 onRemove: _removeFromCart,
                 onFinish: _finishSale,
-              );
+              )
+            : _SalesHistory(repository: widget.repository);
       },
     );
 
@@ -181,6 +183,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icon(Icons.point_of_sale_outlined),
                   selectedIcon: Icon(Icons.point_of_sale),
                   label: 'PDV',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.receipt_long_outlined),
+                  selectedIcon: Icon(Icons.receipt_long),
+                  label: 'Vendas',
                 ),
               ],
             ),
@@ -283,15 +290,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _finishSale(String customer, String payment) async {
     if (_cart.isEmpty) return;
-    var success = true;
-    for (final line in _cart.values.toList()) {
-      final result = await widget.repository.registerExit(
-        product: line.product,
-        quantity: line.quantity,
-        reason: 'PDV - $customer - $payment',
-      );
-      if (!result.success) success = false;
-    }
+    final result = await widget.repository.createSale(
+      payment: payment,
+      items: _cart.values
+          .map(
+            (line) => {
+              'produtoId': line.product.id,
+              'quantidade': line.quantity,
+            },
+          )
+          .toList(),
+    );
+    final success = result.success;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -528,6 +538,11 @@ class _DesktopNavigation extends StatelessWidget {
                   icon: Icon(Icons.point_of_sale_outlined),
                   selectedIcon: Icon(Icons.point_of_sale),
                   label: Text('PDV'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.receipt_long_outlined),
+                  selectedIcon: Icon(Icons.receipt_long),
+                  label: Text('Vendas'),
                 ),
               ],
             ),
@@ -954,6 +969,50 @@ class _SaleViewState extends State<_SaleView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SalesHistory extends StatelessWidget {
+  const _SalesHistory({required this.repository});
+  final InventoryRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: repository.getSalesHistory(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return const Center(
+            child: Text('Nao foi possivel carregar o historico.'),
+          );
+        }
+        final sales = snapshot.data ?? const <Map<String, dynamic>>[];
+        if (sales.isEmpty) {
+          return const Center(child: Text('Nenhuma venda registrada.'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: sales.length,
+          itemBuilder: (context, index) {
+            final sale = sales[index];
+            final value = double.tryParse('${sale['valor_total']}') ?? 0;
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.receipt_long),
+                title: Text('Pedido #${sale['id_pedido']}'),
+                subtitle: Text(
+                  '${sale['forma_pagamento']} • ${sale['itens']} item(ns)',
+                ),
+                trailing: Text('R\$ ${value.toStringAsFixed(2)}'),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

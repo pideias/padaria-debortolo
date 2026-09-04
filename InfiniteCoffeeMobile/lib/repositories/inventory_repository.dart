@@ -17,7 +17,7 @@ class InventoryRepository {
     try {
       final products = await _api.getStock(search: search);
       await _saveProducts(products);
-      unawaited(_syncPending());
+      unawaited(_syncPending().catchError((_) {}));
       return InventorySnapshot(products: products, isOffline: false);
     } catch (error) {
       final products = await _readProducts();
@@ -45,17 +45,59 @@ class InventoryRepository {
   }
 
   Future<InventorySnapshot> syncNow({String search = ''}) async {
-    await _syncPending();
+    try {
+      await _syncPending();
+    } catch (_) {
+      // The queue remains persisted and will be retried on the next refresh.
+    }
     return load(search: search);
   }
 
   Future<void> backup() => _api.backup();
+
+  Future<List<Map<String, dynamic>>> getSalesHistory() =>
+      _api.getSalesHistory();
+
+  Future<ExitResult> createSale({
+    required String payment,
+    required List<Map<String, int>> items,
+  }) async {
+    try {
+      await _api.createSale(payment: payment, items: items);
+      return const ExitResult(true, 'Venda finalizada com sucesso.');
+    } catch (error) {
+      if (!_isRetryable(error)) {
+        return ExitResult(false, _errorMessage(error));
+      }
+      final preferences = await SharedPreferences.getInstance();
+      final pending = preferences.getStringList(_pendingKey) ?? [];
+      pending.add(
+        jsonEncode({
+          'tipo': 'venda',
+          'clientUuid': _clientUuid(),
+          'formaPagamento': payment,
+          'itens': items,
+        }),
+      );
+      await preferences.setStringList(_pendingKey, pending);
+      for (final item in items) {
+        await _changeCachedQuantity(item['produtoId']!, -item['quantidade']!);
+      }
+      return const ExitResult(
+        true,
+        'Venda salva offline e sera sincronizada depois.',
+      );
+    }
+  }
 
   Future<ExitResult> registerExit({
     required Product product,
     required int quantity,
     required String reason,
   }) async {
+    if (quantity < 1) {
+      return const ExitResult(false, 'Informe uma quantidade valida.');
+    }
     if (quantity > product.quantity) {
       return const ExitResult(false, 'Estoque insuficiente.');
     }
@@ -68,15 +110,16 @@ class InventoryRepository {
       await _changeCachedQuantity(product.id, -quantity);
       return const ExitResult(true, 'Saida registrada com sucesso.');
     } catch (error) {
-      if (error is ApiException &&
-          (error.statusCode == 401 || error.statusCode == 403)) {
-        return ExitResult(false, error.message);
+      if (!_isRetryable(error)) {
+        return ExitResult(false, _errorMessage(error));
       }
       // Sem internet, a operacao fica guardada para envio posterior.
       final preferences = await SharedPreferences.getInstance();
       final pending = preferences.getStringList(_pendingKey) ?? [];
       pending.add(
         jsonEncode({
+          'tipo': 'saida',
+          'clientUuid': _clientUuid(),
           'produtoId': product.id,
           'quantidade': quantity,
           'motivo': reason,
@@ -108,15 +151,15 @@ class InventoryRepository {
       await _changeCachedQuantity(product.id, quantity);
       return const ExitResult(true, 'Entrada registrada com sucesso.');
     } catch (error) {
-      if (error is ApiException &&
-          (error.statusCode == 401 || error.statusCode == 403)) {
-        return ExitResult(false, error.message);
+      if (!_isRetryable(error)) {
+        return ExitResult(false, _errorMessage(error));
       }
       final preferences = await SharedPreferences.getInstance();
       final pending = preferences.getStringList(_pendingKey) ?? [];
       pending.add(
         jsonEncode({
           'tipo': 'entrada',
+          'clientUuid': _clientUuid(),
           'produtoId': product.id,
           'quantidade': quantity,
           'motivo': reason,
@@ -160,29 +203,37 @@ class InventoryRepository {
   Future<void> _syncPending() async {
     final preferences = await SharedPreferences.getInstance();
     final pending = preferences.getStringList(_pendingKey) ?? [];
-    final remaining = <String>[];
-    for (final item in pending) {
-      final data = jsonDecode(item) as Map<String, dynamic>;
-      try {
-        if (data['tipo'] == 'entrada') {
-          await _api.registerEntry(
-            productId: data['produtoId'],
-            quantity: data['quantidade'],
-            reason: data['motivo'],
-          );
-        } else {
-          await _api.registerExit(
-            productId: data['produtoId'],
-            quantity: data['quantidade'],
-            reason: data['motivo'],
-          );
-        }
-      } catch (_) {
-        remaining.add(item);
-      }
-    }
+    if (pending.isEmpty) return;
+    final operations = pending.map((item) {
+      final operation = jsonDecode(item) as Map<String, dynamic>;
+      operation['clientUuid'] ??= _clientUuid();
+      operation['tipo'] ??= 'saida';
+      operation['payload'] ??= Map<String, dynamic>.from(operation)
+        ..remove('tipo')
+        ..remove('clientUuid')
+        ..remove('payload');
+      return operation;
+    }).toList();
+    final accepted = await _api.pushSync(operations);
+    final remaining = operations
+        .where((item) => !accepted.contains(item['clientUuid']))
+        .map(jsonEncode)
+        .toList();
     await preferences.setStringList(_pendingKey, remaining);
   }
+
+  String _clientUuid() =>
+      '${DateTime.now().microsecondsSinceEpoch}-${_api.hashCode}';
+
+  bool _isRetryable(Object error) {
+    if (error is! ApiException) return true;
+    final status = error.statusCode;
+    return status == null || status == 408 || status == 429 || status >= 500;
+  }
+
+  String _errorMessage(Object error) => error is ApiException
+      ? error.message
+      : 'Nao foi possivel concluir a operacao.';
 
   Future<void> _saveProducts(List<Product> products) async {
     final preferences = await SharedPreferences.getInstance();
