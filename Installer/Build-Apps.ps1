@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ApiBaseUrl = 'https://padaria-debortolo-api-8v6w.onrender.com',
+    [string]$ApiBaseUrl = 'https://padaria-debortolo-api-8w5w.onrender.com',
     [switch]$SkipWindows,
     [switch]$SkipAndroid
 )

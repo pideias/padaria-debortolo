@@ -39,7 +39,7 @@ SQL Server infiniteCoffee (fonte da verdade)
 - No app, o Hive e o espelho offline local; ele nao substitui o SQL Server.
 - O app nao conversa diretamente com outro dispositivo. Windows e celular conversam
   entre si por meio da API e do SQL Server.
-- Windows e Android usam `https://padaria-debortolo-api-8v6w.onrender.com` por padrao.
+- Windows e Android usam `https://padaria-debortolo-api-8w5w.onrender.com` por padrao.
 - Para desenvolvimento local, compile informando `API_BASE_URL` com a URL local desejada.
 
 ## Fluxo de inicializacao do Flutter
@@ -184,7 +184,7 @@ flutter run -d emulator-5554
 - Os tokens continuam aceitos por compatibilidade, mas nao sao obrigatorios enquanto a API
   demonstrativa estiver publica. APKs novos podem ser compilados sem `API_ACCESS_TOKEN` e
   `API_WRITE_TOKEN`.
-- O cliente mobile e o desktop usam por padrao `https://padaria-debortolo-api-8v6w.onrender.com`
+- O cliente mobile e o desktop usam por padrao `https://padaria-debortolo-api-8w5w.onrender.com`
   para leitura e escrita. Para desenvolvimento local, compile explicitamente com
   `API_BASE_URL` e `API_WRITE_BASE_URL` apontando para a API local. O cliente aguarda ate 60
   segundos para permitir o despertar da instancia gratuita.

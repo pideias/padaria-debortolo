@@ -61,7 +61,7 @@ Repositorio e branch observados:
 - O workflow `Validate` do GitHub Actions passou no ultimo commit consultado.
 - Isso comprova build, testes e smoke tests do workflow, mas nao comprova sync completo em
   producao.
-- O endpoint publico observado `https://padaria-debortolo-api-8v6w.onrender.com/api/health`
+- O endpoint publico observado `https://padaria-debortolo-api-8w5w.onrender.com/api/health`
   retornou HTTP 503.
 - O endpoint publico `/api/estoque` tambem retornou HTTP 503.
 - Antes de declarar a integracao pronta, corrigir a configuracao do Render, o arquivo do
@@ -77,7 +77,7 @@ O codigo observado separa os enderecos por plataforma:
 - Emulador Android: preferir `http://10.0.2.2:5049` quando a API estiver no PC.
 - Celular fisico: IP LAN do computador, por exemplo `http://192.168.1.101:5049`.
 - Web local: `http://localhost:5049` para a API e porta separada para o Flutter Web.
-- API Render: `https://padaria-debortolo-api-8v6w.onrender.com` quando estiver configurada.
+- API Render: `https://padaria-debortolo-api-8w5w.onrender.com` quando estiver configurada.
 
 Regra importante: `localhost` no celular aponta para o celular, nao para o computador.
 
