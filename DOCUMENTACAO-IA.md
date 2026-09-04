@@ -230,3 +230,6 @@ flutter run -d emulator-5554
   `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`. Compartilhe a pasta do Drive com o e-mail da conta de
   serviço. O Google Drive continua somente como destino de backup/snapshot e é acessado apenas
   pelo backend via API.
+- Para hospedar o SQL Server fora do PC local, use uma VM x86/AMD da Oracle Cloud conforme
+  `OracleCloud/README.md`. O Render recebe o IP publico e a senha apenas em
+  `PADARIA_CONNECTION_STRING`; nenhuma credencial deve entrar no repositorio.
