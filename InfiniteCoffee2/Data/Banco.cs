@@ -263,6 +263,12 @@ namespace InfiniteCoffee2.Data
                     ALTER TABLE dbo.Produtos ADD modified_at DATETIME NOT NULL CONSTRAINT DF_Produtos_modified DEFAULT GETUTCDATE();
                 IF COL_LENGTH('dbo.MovimentacoesEstoque', 'modified_at') IS NULL
                     ALTER TABLE dbo.MovimentacoesEstoque ADD modified_at DATETIME NOT NULL CONSTRAINT DF_Mov_modified DEFAULT GETUTCDATE();
+                IF OBJECT_ID(N'dbo.SyncOperations', N'U') IS NULL
+                    CREATE TABLE dbo.SyncOperations (
+                        client_uuid VARCHAR(100) NOT NULL PRIMARY KEY,
+                        tipo VARCHAR(30) NOT NULL,
+                        created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+                    );
                 IF OBJECT_ID(N'dbo.trg_Produtos_sync', N'TR') IS NOT NULL DROP TRIGGER dbo.trg_Produtos_sync;
                 EXEC('CREATE TRIGGER dbo.trg_Produtos_sync ON dbo.Produtos AFTER INSERT, UPDATE AS
                     UPDATE p SET modified_at = GETUTCDATE() FROM dbo.Produtos p JOIN inserted i ON i.id_produto = p.id_produto;');
@@ -289,7 +295,7 @@ namespace InfiniteCoffee2.Data
             using (var count = new SqlCommand("SELECT COUNT(*) FROM Produtos WHERE ativo = 1", conn))
                 snapshot.ProdutosTotal = Convert.ToInt32(count.ExecuteScalar());
 
-            using (var cmd = new SqlCommand("SELECT id_produto, nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao, modified_at FROM Produtos WHERE ativo = 1 AND modified_at > @since ORDER BY id_produto", conn))
+            using (var cmd = new SqlCommand("SELECT id_produto, nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao, ativo, modified_at FROM Produtos WHERE modified_at > @since ORDER BY id_produto", conn))
             {
                 cmd.Parameters.AddWithValue("@since", since);
                 using var reader = cmd.ExecuteReader();
@@ -303,6 +309,7 @@ namespace InfiniteCoffee2.Data
                         ["quantidade_estoque"] = reader["quantidade_estoque"],
                         ["codigo_barras"] = Convert.IsDBNull(reader["codigo_barras"]) ? null! : reader["codigo_barras"],
                         ["descricao"] = Convert.IsDBNull(reader["descricao"]) ? null! : reader["descricao"],
+                        ["ativo"] = reader["ativo"],
                         ["modified_at"] = DateTime.SpecifyKind(Convert.ToDateTime(reader["modified_at"]), DateTimeKind.Utc).ToString("o")
                     });
             }
@@ -325,6 +332,34 @@ namespace InfiniteCoffee2.Data
             }
 
             return snapshot;
+        }
+
+        public static bool ClaimSyncOperation(string clientUuid, string tipo)
+        {
+            GarantirEstruturaSync();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("INSERT INTO SyncOperations (client_uuid, tipo) VALUES (@uuid, @tipo)", conn);
+            cmd.Parameters.AddWithValue("@uuid", clientUuid);
+            cmd.Parameters.AddWithValue("@tipo", tipo);
+            try
+            {
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (SqlException ex) when (ex.Number is 2601 or 2627)
+            {
+                return false;
+            }
+        }
+
+        public static void ReleaseSyncOperation(string clientUuid)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("DELETE FROM SyncOperations WHERE client_uuid = @uuid", conn);
+            cmd.Parameters.AddWithValue("@uuid", clientUuid);
+            cmd.ExecuteNonQuery();
         }
 
         public sealed class SyncSnapshot
@@ -380,6 +415,36 @@ namespace InfiniteCoffee2.Data
                 ["faturamento_hoje"] = reader["faturamento_hoje"],
                 ["itens_vendidos"] = reader["itens_vendidos"]
             };
+        }
+
+        public static List<Dictionary<string, object>> HistoricoVendas(int limite = 200)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT TOP (@limite) p.id_pedido, p.datahora, p.status_pedido,
+                       ISNULL(MAX(pg.forma_pagamento), '') AS forma_pagamento,
+                       ISNULL(MAX(pg.valor_total), 0) AS valor_total,
+                       COUNT(i.id_itens_pedidos) AS itens
+                FROM Pedidos p
+                LEFT JOIN Pagamentos pg ON pg.pedidoid = p.id_pedido
+                LEFT JOIN Itens_Pedidos i ON i.pedidoid = p.id_pedido
+                GROUP BY p.id_pedido, p.datahora, p.status_pedido
+                ORDER BY p.datahora DESC, p.id_pedido DESC", conn);
+            cmd.Parameters.AddWithValue("@limite", Math.Clamp(limite, 1, 500));
+            using var reader = cmd.ExecuteReader();
+            var lista = new List<Dictionary<string, object>>();
+            while (reader.Read())
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["id_pedido"] = reader["id_pedido"],
+                    ["datahora"] = reader["datahora"],
+                    ["status_pedido"] = reader["status_pedido"],
+                    ["forma_pagamento"] = reader["forma_pagamento"],
+                    ["valor_total"] = reader["valor_total"],
+                    ["itens"] = reader["itens"]
+                });
+            return lista;
         }
 
         public static int FinalizarVenda(int? clienteId, int? mesaId, int? funcionarioId, string formaPagamento, IEnumerable<SaleItemData> itens)

@@ -1,4 +1,5 @@
 using InfiniteCoffee2.Data;
+using InfiniteCoffee2.Middleware;
 using InfiniteCoffee2.Services;
 
 namespace InfiniteCoffee2
@@ -64,6 +65,7 @@ namespace InfiniteCoffee2
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseMiddleware<ApiKeyMiddleware>();
             app.UseCors("FlutterDevelopment");
 
             // Swagger fica disponível para o grupo testar as APIs durante o desenvolvimento.
@@ -82,6 +84,7 @@ namespace InfiniteCoffee2
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+            app.MapControllers();
 
             app.Run();
 

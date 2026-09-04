@@ -102,36 +102,21 @@ Liberar a porta 5049 somente na rede privada do Windows:
 netsh advfirewall firewall add rule name="Padaria Debortolo API" dir=in action=allow protocol=TCP localport=5049 profile=private
 ```
 
-## API local com Google Drive
+## API remota com Google Drive
 
-O backup manual e automatico exige duas configuracoes:
+O APK e o desktop nao recebem credenciais do Google Drive. Ambos chamam a API central
+no Render, e o backend publica os snapshots pela API do Drive.
 
-- caminho do arquivo OAuth `client_secret*.json`;
-- ID da pasta compartilhada do Google Drive.
-
-Iniciar usando o script oficial:
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\Installer\Start-LocalWithGoogleDrive.ps1 `
-  -CredentialsPath "C:\CAMINHO\client_secret.json" `
-  -FolderId "ID_DA_PASTA_NO_DRIVE"
-```
-
-O script configura estas variaveis somente no processo da API:
+No Render, configure como segredos:
 
 ```text
-GOOGLE_DRIVE_OAUTH_CLIENT_PATH
-GOOGLE_DRIVE_FOLDER_ID
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON=<JSON completo da conta de servico>
+GOOGLE_DRIVE_FOLDER_ID=<ID da pasta compartilhada>
 GOOGLE_DRIVE_SNAPSHOT_NAME=estoque.json
 ```
 
-Na primeira execucao, autorizar a conta Google no navegador. O token OAuth sera salvo no perfil local do usuario em:
-
-```text
-%LOCALAPPDATA%\PadariaDebortolo\GoogleDriveToken
-```
-
-Nao colocar o arquivo `client_secret*.json` nem a pasta de token no Git.
+Compartilhe a pasta do Drive com o e-mail da conta de servico. Nao coloque o JSON da
+conta de servico no Git nem dentro do APK ou do executavel.
 
 O servico publica:
 

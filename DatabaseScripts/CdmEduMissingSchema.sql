@@ -2,6 +2,9 @@
 -- Nao remove dados nem altera as telas existentes.
 USE infiniteCoffee;
 
+IF OBJECT_ID('dbo.SyncOperations', 'U') IS NULL
+    CREATE TABLE SyncOperations (client_uuid VARCHAR(100) NOT NULL PRIMARY KEY, tipo VARCHAR(30) NOT NULL, created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME());
+
 IF OBJECT_ID('dbo.Clientes', 'U') IS NULL
     CREATE TABLE Clientes (id_cliente INT IDENTITY(1,1) PRIMARY KEY, nome_cliente VARCHAR(100) NOT NULL, email VARCHAR(100) NULL, telefone VARCHAR(20) NULL);
 IF OBJECT_ID('dbo.Funcionarios', 'U') IS NULL

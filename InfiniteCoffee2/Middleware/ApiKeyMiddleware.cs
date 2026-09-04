@@ -37,8 +37,13 @@ public sealed class ApiKeyMiddleware
         var writeRequest = !HttpMethods.IsGet(context.Request.Method) &&
                            !HttpMethods.IsHead(context.Request.Method) &&
                            !HttpMethods.IsOptions(context.Request.Method);
-        var authorized = string.IsNullOrWhiteSpace(configuredToken)
-            ? string.IsNullOrWhiteSpace(readOnlyToken) && loopback
+        var noTokensConfigured = string.IsNullOrWhiteSpace(configuredToken) &&
+                                 string.IsNullOrWhiteSpace(readOnlyToken) &&
+                                 string.IsNullOrWhiteSpace(mobileWriteToken);
+        var authorized = noTokensConfigured
+            ? true
+            : string.IsNullOrWhiteSpace(configuredToken)
+              ? string.IsNullOrWhiteSpace(readOnlyToken) && loopback
             : Matches(suppliedToken, configuredToken) ||
               (!writeRequest && Matches(suppliedToken, readOnlyToken)) ||
               Matches(suppliedToken, mobileWriteToken);

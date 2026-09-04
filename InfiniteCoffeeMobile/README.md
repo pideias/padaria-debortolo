@@ -16,8 +16,8 @@ Leia primeiro, na raiz do repositorio:
 
 - SQL Server e a fonte oficial dos dados.
 - Hive e o espelho local offline; nao e SQLite.
-- Windows usa `http://localhost:5049`, o emulador Android usa `http://10.0.2.2:5049`
-  e um celular fisico usa o IP LAN do computador.
+- Windows e Android usam `https://padaria-debortolo-api-8v6w.onrender.com` por padrao.
+  Para desenvolvimento local, informe `API_BASE_URL` explicitamente no build.
 - `LocalDatabase` persiste produtos, movimentacoes, fila (`sync_queue`) e token (`sync_state`).
 - `SyncService` executa push/pull em segundo plano; a tela nao deve piscar durante sync.
 - Produto excluido e inativado no servidor (`ativo = 0`) para preservar historico de vendas.
