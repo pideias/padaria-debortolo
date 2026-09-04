@@ -11,7 +11,7 @@ class InventoryApi {
   final http.Client _client;
   static const _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://padaria-debortolo-api-8v6w.onrender.com',
+    defaultValue: 'https://padaria-debortolo-api-8w5w.onrender.com',
   );
   static const _configuredWriteBaseUrl = String.fromEnvironment(
     'API_WRITE_BASE_URL',
