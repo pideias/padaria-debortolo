@@ -876,7 +876,14 @@ class _SaleViewState extends State<_SaleView> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'Pix', child: Text('Pix')),
-                    DropdownMenuItem(value: 'Cartão', child: Text('Cartão')),
+                    DropdownMenuItem(
+                      value: 'Cartão de crédito',
+                      child: Text('Cartão de crédito'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Cartão de débito',
+                      child: Text('Cartão de débito'),
+                    ),
                     DropdownMenuItem(
                       value: 'Dinheiro',
                       child: Text('Dinheiro'),
