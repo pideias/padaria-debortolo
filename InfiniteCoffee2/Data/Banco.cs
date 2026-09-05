@@ -199,6 +199,25 @@ namespace InfiniteCoffee2.Data
             }
         }
 
+        public static bool AtualizarDadosProduto(int id, string nome, decimal preco, string tipo, string codigoBarras, string descricao)
+        {
+            GarantirEstruturaEstoque();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE Produtos
+                SET nome_produto = @nome, preco = @preco, tipo = @tipo,
+                    codigo_barras = @codigoBarras, descricao = @descricao
+                WHERE id_produto = @id AND ativo = 1", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@nome", nome.Trim());
+            cmd.Parameters.AddWithValue("@preco", preco);
+            cmd.Parameters.AddWithValue("@tipo", tipo.Trim());
+            cmd.Parameters.AddWithValue("@codigoBarras", string.IsNullOrWhiteSpace(codigoBarras) ? DBNull.Value : codigoBarras.Trim());
+            cmd.Parameters.AddWithValue("@descricao", string.IsNullOrWhiteSpace(descricao) ? DBNull.Value : descricao.Trim());
+            return cmd.ExecuteNonQuery() == 1;
+        }
+
         public static bool ExcluirProduto(int id)
         {
             // Produtos podem ser referenciados por Itens_Pedidos. Inativar preserva
@@ -466,11 +485,22 @@ namespace InfiniteCoffee2.Data
             using var conn = new SqlConnection(connectionString);
             conn.Open();
             using var cmd = new SqlCommand(@"
-                SELECT TOP (@limite) p.id_pedido, p.datahora, p.status_pedido,
+                SELECT TOP (@limite)
+                       ROW_NUMBER() OVER (ORDER BY p.datahora DESC, p.id_pedido DESC) AS numero_relatorio,
+                       p.id_pedido, p.datahora, p.status_pedido,
                        ISNULL(MAX(pg.forma_pagamento), '') AS forma_pagamento,
                        ISNULL(MAX(pg.valor_total), 0) AS valor_total,
                        ISNULL(MAX(c.nome_cliente), 'Cliente não informado') AS cliente_nome,
-                       COUNT(i.id_itens_pedidos) AS itens
+                       COUNT(i.id_itens_pedidos) AS itens,
+                       ISNULL((
+                           SELECT STRING_AGG(
+                               CONVERT(varchar(max), CONCAT(i2.quantidade, 'x ', pr2.nome_produto)),
+                               ', '
+                           )
+                           FROM Itens_Pedidos i2
+                           INNER JOIN Produtos pr2 ON pr2.id_produto = i2.produtoid
+                           WHERE i2.pedidoid = p.id_pedido
+                       ), '') AS itens_detalhes
                 FROM Pedidos p
                 LEFT JOIN Clientes c ON c.id_cliente = p.clienteid
                 LEFT JOIN Pagamentos pg ON pg.pedidoid = p.id_pedido
@@ -481,16 +511,18 @@ namespace InfiniteCoffee2.Data
             using var reader = cmd.ExecuteReader();
             var lista = new List<Dictionary<string, object>>();
             while (reader.Read())
-                lista.Add(new Dictionary<string, object>
-                {
-                    ["id_pedido"] = reader["id_pedido"],
+                 lista.Add(new Dictionary<string, object>
+                 {
+                     ["numero_relatorio"] = reader["numero_relatorio"],
+                     ["id_pedido"] = reader["id_pedido"],
                     ["datahora"] = reader["datahora"],
                     ["status_pedido"] = reader["status_pedido"],
                     ["forma_pagamento"] = reader["forma_pagamento"],
                     ["valor_total"] = reader["valor_total"],
-                    ["cliente_nome"] = reader["cliente_nome"],
-                    ["itens"] = reader["itens"]
-                });
+                     ["cliente_nome"] = reader["cliente_nome"],
+                     ["itens"] = reader["itens"],
+                     ["itens_detalhes"] = reader["itens_detalhes"]
+                 });
             return lista;
         }
 

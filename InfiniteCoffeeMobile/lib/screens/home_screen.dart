@@ -74,7 +74,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 onOpenStock: () => setState(() => _selectedIndex = 2),
               )
             : _selectedIndex == 1
-            ? _ProductsView(products: data.products, onSearch: _reload)
+            ? _ProductsView(
+                products: data.products,
+                onSearch: _reload,
+                onEdit: _showProductDialog,
+                onDelete: _deleteProduct,
+              )
             : _selectedIndex == 2
             ? _StockView(
                 products: data.products,
@@ -85,6 +90,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onExit: _registerExit,
                 onEntry: _registerEntry,
                 onCreateProduct: _showProductDialog,
+                onEdit: _showProductDialog,
+                onDelete: _deleteProduct,
                 onSync: _syncNow,
               )
             : _selectedIndex == 3
@@ -273,18 +280,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _showProductDialog() async {
-    final name = TextEditingController();
-    final description = TextEditingController();
-    final barcode = TextEditingController();
-    final price = TextEditingController();
-    final quantity = TextEditingController(text: '0');
-    final type = TextEditingController(text: 'Produto');
+  Future<void> _showProductDialog([Product? product]) async {
+    final editing = product != null;
+    final name = TextEditingController(text: product?.name);
+    final description = TextEditingController(text: product?.description);
+    final barcode = TextEditingController(text: product?.barcode);
+    final price = TextEditingController(
+      text: product?.price.toStringAsFixed(2),
+    );
+    final quantity = TextEditingController(text: '${product?.quantity ?? 0}');
+    final type = TextEditingController(text: product?.type ?? 'Produto');
     final created = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        title: const Text('Cadastrar produto'),
+        title: Text(editing ? 'Editar produto' : 'Cadastrar produto'),
         contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
         content: SizedBox(
           width: 420,
@@ -317,9 +327,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: quantity,
+                  enabled: !editing,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'Quantidade inicial',
+                    helperText: 'Para alterar estoque, use entrada ou saída.',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -341,26 +353,66 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final result = await widget.repository.createProduct(
-                name: name.text,
-                description: description.text,
-                barcode: barcode.text,
-                type: type.text,
-                price: double.tryParse(price.text.replaceAll(',', '.')) ?? 0,
-                quantity: int.tryParse(quantity.text) ?? -1,
-              );
+              final result = editing
+                  ? await widget.repository.updateProduct(
+                      product: product,
+                      name: name.text,
+                      description: description.text,
+                      barcode: barcode.text,
+                      type: type.text,
+                      price:
+                          double.tryParse(price.text.replaceAll(',', '.')) ?? 0,
+                    )
+                  : await widget.repository.createProduct(
+                      name: name.text,
+                      description: description.text,
+                      barcode: barcode.text,
+                      type: type.text,
+                      price:
+                          double.tryParse(price.text.replaceAll(',', '.')) ?? 0,
+                      quantity: int.tryParse(quantity.text) ?? -1,
+                    );
               if (context.mounted) {
                 ScaffoldMessenger.of(context)
                     .showSnackBar(SnackBar(content: Text(result.message)));
                 Navigator.pop(context, result.success);
               }
             },
-            child: const Text('Salvar'),
+            child: Text(editing ? 'Atualizar' : 'Salvar'),
           ),
         ],
       ),
     );
     if (created == true && mounted) _reload();
+  }
+
+  Future<void> _deleteProduct(Product product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir produto?'),
+        content: Text(
+          'O produto "${product.name}" ficará inativo e sairá das listas. '
+          'O histórico de vendas será preservado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final result = await widget.repository.deleteProduct(product);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(result.message)));
+    if (result.success) _reload(_search);
   }
 
   Future<void> _registerEntry(Product product) async {
@@ -601,13 +653,25 @@ class _Dashboard extends StatelessWidget {
 }
 
 class _ProductsView extends StatelessWidget {
-  const _ProductsView({required this.products, required this.onSearch});
+  const _ProductsView({
+    required this.products,
+    required this.onSearch,
+    required this.onEdit,
+    required this.onDelete,
+  });
   final List<Product> products;
   final ValueChanged<String> onSearch;
+  final ValueChanged<Product> onEdit;
+  final ValueChanged<Product> onDelete;
 
   @override
-  Widget build(BuildContext context) =>
-      _ProductList(title: 'Produtos', products: products, onSearch: onSearch);
+  Widget build(BuildContext context) => _ProductList(
+    title: 'Produtos',
+    products: products,
+    onSearch: onSearch,
+    onEdit: onEdit,
+    onDelete: onDelete,
+  );
 }
 
 class _StockView extends StatelessWidget {
@@ -620,6 +684,8 @@ class _StockView extends StatelessWidget {
     required this.onExit,
     required this.onEntry,
     required this.onCreateProduct,
+    required this.onEdit,
+    required this.onDelete,
     required this.onSync,
   });
   final List<Product> products;
@@ -630,6 +696,8 @@ class _StockView extends StatelessWidget {
   final ValueChanged<Product> onExit;
   final ValueChanged<Product> onEntry;
   final VoidCallback onCreateProduct;
+  final ValueChanged<Product> onEdit;
+  final ValueChanged<Product> onDelete;
   final VoidCallback onSync;
 
   @override
@@ -689,6 +757,8 @@ class _StockView extends StatelessWidget {
             onSearch: onSearch,
             onExit: onExit,
             onEntry: onEntry,
+            onEdit: onEdit,
+            onDelete: onDelete,
           ),
         ),
       ],
@@ -705,6 +775,8 @@ class _ProductList extends StatelessWidget {
     this.onExit,
     this.onEntry,
     this.onAdd,
+    this.onEdit,
+    this.onDelete,
   });
   final String title;
   final List<Product> products;
@@ -713,6 +785,8 @@ class _ProductList extends StatelessWidget {
   final ValueChanged<Product>? onExit;
   final ValueChanged<Product>? onEntry;
   final ValueChanged<Product>? onAdd;
+  final ValueChanged<Product>? onEdit;
+  final ValueChanged<Product>? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -754,7 +828,11 @@ class _ProductList extends StatelessWidget {
                           '${product.type} • ${product.barcode ?? 'Sem código'}',
                         ),
                         trailing:
-                            onExit == null && onEntry == null && onAdd == null
+                            onExit == null &&
+                                onEntry == null &&
+                                onAdd == null &&
+                                onEdit == null &&
+                                onDelete == null
                             ? Text('${product.quantity} un.')
                             : Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -791,6 +869,18 @@ class _ProductList extends StatelessWidget {
                                           ? null
                                           : () => onAdd!(product),
                                       icon: const Icon(Icons.add_shopping_cart),
+                                    ),
+                                  if (onEdit != null)
+                                    IconButton(
+                                      tooltip: 'Editar produto',
+                                      onPressed: () => onEdit!(product),
+                                      icon: const Icon(Icons.edit_outlined),
+                                    ),
+                                  if (onDelete != null)
+                                    IconButton(
+                                      tooltip: 'Excluir produto',
+                                      onPressed: () => onDelete!(product),
+                                      icon: const Icon(Icons.delete_outline),
                                     ),
                                 ],
                               ),
@@ -837,106 +927,131 @@ class _SaleViewState extends State<_SaleView> {
       0,
       (sum, line) => sum + line.product.price * line.quantity,
     );
-    return Column(
-      children: [
-        Card(
-          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cartItemsHeight = (constraints.maxHeight * .28).clamp(
+          96.0,
+          190.0,
+        );
+        return Column(
+          children: [
+            Card(
+              margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Carrinho (${widget.cart.length} itens)',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'R\$ ${total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-                TextField(
-                  controller: _customer,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(labelText: 'Cliente'),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _payment,
-                  decoration: const InputDecoration(
-                    labelText: 'Forma de pagamento',
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Pix', child: Text('Pix')),
-                    DropdownMenuItem(
-                      value: 'Cartão de crédito',
-                      child: Text('Cartão de crédito'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Cartão de débito',
-                      child: Text('Cartão de débito'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Dinheiro',
-                      child: Text('Dinheiro'),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _payment = value ?? 'Pix'),
-                ),
-                if (widget.cart.isNotEmpty)
-                  ...widget.cart.map(
-                    (line) => Row(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text('${line.quantity}x ${line.product.name}'),
+                        Text(
+                          'Carrinho (${widget.cart.length} itens)',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          'R\$ ${(line.product.price * line.quantity).toStringAsFixed(2)}',
-                        ),
-                        IconButton(
-                          onPressed: () => widget.onRemove(line.product),
-                          icon: const Icon(Icons.remove_circle_outline),
+                          'R\$ ${total.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                if (widget.cart.isNotEmpty)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _customer.text.trim().isEmpty
-                          ? null
-                          : () => widget.onFinish(
-                              _customer.text.trim(),
-                              _payment,
-                            ),
-                      icon: const Icon(Icons.check),
-                      label: const Text('Finalizar venda'),
+                    TextField(
+                      controller: _customer,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(labelText: 'Cliente'),
+                      textInputAction: TextInputAction.next,
                     ),
-                  ),
-              ],
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: _payment,
+                      decoration: const InputDecoration(
+                        labelText: 'Forma de pagamento',
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Pix', child: Text('Pix')),
+                        DropdownMenuItem(
+                          value: 'Cartão de crédito',
+                          child: Text('Cartão de crédito'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Cartão de débito',
+                          child: Text('Cartão de débito'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Dinheiro',
+                          child: Text('Dinheiro'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _payment = value ?? 'Pix'),
+                    ),
+                    if (widget.cart.isNotEmpty)
+                      SizedBox(
+                        height: cartItemsHeight,
+                        child: Scrollbar(
+                          thumbVisibility: true,
+                          child: ListView.builder(
+                            itemCount: widget.cart.length,
+                            itemBuilder: (context, index) {
+                              final line = widget.cart[index];
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${line.quantity}x ${line.product.name}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    'R\$ ${(line.product.price * line.quantity).toStringAsFixed(2)}',
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () =>
+                                        widget.onRemove(line.product),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    if (widget.cart.isNotEmpty)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _customer.text.trim().isEmpty
+                              ? null
+                              : () => widget.onFinish(
+                                  _customer.text.trim(),
+                                  _payment,
+                                ),
+                          icon: const Icon(Icons.check),
+                          label: const Text('Finalizar venda'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-        Expanded(
-          child: _ProductList(
-            title: 'Adicionar itens à venda',
-            products: widget.products,
-            search: widget.search,
-            onSearch: widget.onSearch,
-            onAdd: widget.onAdd,
-          ),
-        ),
-      ],
+            Expanded(
+              child: _ProductList(
+                title: 'Adicionar itens à venda',
+                products: widget.products,
+                search: widget.search,
+                onSearch: widget.onSearch,
+                onAdd: widget.onAdd,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -969,14 +1084,26 @@ class _SalesHistory extends StatelessWidget {
             final sale = sales[index];
             final value = double.tryParse('${sale['valor_total']}') ?? 0;
             return Card(
-              child: ListTile(
+              child: ExpansionTile(
                 leading: const Icon(Icons.receipt_long),
-                title: Text('Pedido #${sale['id_pedido']}'),
+                title: Text(
+                  'Venda ${sale['numero_relatorio'] ?? index + 1} • '
+                  'Pedido #${sale['id_pedido']}',
+                ),
                 subtitle: Text(
                   '${sale['cliente_nome'] ?? 'Cliente não informado'} • '
                   '${sale['forma_pagamento']} • ${sale['itens']} item(ns)',
                 ),
                 trailing: Text('R\$ ${value.toStringAsFixed(2)}'),
+                children: [
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.shopping_basket_outlined),
+                    title: Text(
+                      '${sale['itens_detalhes'] ?? 'Itens não informados'}',
+                    ),
+                  ),
+                ],
               ),
             );
           },
