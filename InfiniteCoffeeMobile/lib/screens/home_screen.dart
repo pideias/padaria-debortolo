@@ -256,11 +256,18 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _finishSale(String customer, String payment) async {
+  Future<void> _finishSale(
+    String customer,
+    String payment,
+    int installments,
+  ) async {
     if (_cart.isEmpty) return;
+    final paymentDescription = payment == 'Cartão de crédito'
+        ? '$payment (${installments}x)'
+        : payment;
     final result = await widget.repository.createSale(
       customer: customer,
-      payment: payment,
+      payment: paymentDescription,
       items: _cart.values
           .map(
             (line) => {
@@ -601,6 +608,10 @@ class _Dashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final low = products.where((product) => product.quantity <= 5).toList();
+    final stockValue = products.fold<double>(
+      0,
+      (total, product) => total + product.price * product.quantity,
+    );
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -645,6 +656,14 @@ class _Dashboard extends StatelessWidget {
             subtitle: Text('${products.length} produtos cadastrados'),
             trailing: const Icon(Icons.arrow_forward),
             onTap: onOpenStock,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.payments_outlined),
+            title: const Text('Valor total do estoque'),
+            subtitle: Text('R\$ ${stockValue.toStringAsFixed(2)}'),
           ),
         ),
       ],
@@ -825,6 +844,7 @@ class _ProductList extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
+                          'R\$ ${product.price.toStringAsFixed(2)} • '
                           '${product.type} • ${product.barcode ?? 'Sem código'}',
                         ),
                         trailing:
@@ -911,7 +931,8 @@ class _SaleView extends StatefulWidget {
   final List<CartLine> cart;
   final ValueChanged<Product> onAdd;
   final ValueChanged<Product> onRemove;
-  final Future<void> Function(String customer, String payment) onFinish;
+  final Future<void> Function(String customer, String payment, int installments)
+  onFinish;
 
   @override
   State<_SaleView> createState() => _SaleViewState();
@@ -920,6 +941,7 @@ class _SaleView extends StatefulWidget {
 class _SaleViewState extends State<_SaleView> {
   final _customer = TextEditingController();
   String _payment = 'Pix';
+  int _installments = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -985,9 +1007,29 @@ class _SaleViewState extends State<_SaleView> {
                           child: Text('Dinheiro'),
                         ),
                       ],
-                      onChanged: (value) =>
-                          setState(() => _payment = value ?? 'Pix'),
+                      onChanged: (value) => setState(() {
+                        _payment = value ?? 'Pix';
+                        if (_payment != 'Cartão de crédito') {
+                          _installments = 1;
+                        }
+                      }),
                     ),
+                    if (_payment == 'Cartão de crédito')
+                      DropdownButtonFormField<int>(
+                        initialValue: _installments,
+                        decoration: const InputDecoration(
+                          labelText: 'Parcelas',
+                        ),
+                        items: List.generate(
+                          12,
+                          (index) => DropdownMenuItem(
+                            value: index + 1,
+                            child: Text('${index + 1}x'),
+                          ),
+                        ),
+                        onChanged: (value) =>
+                            setState(() => _installments = value ?? 1),
+                      ),
                     if (widget.cart.isNotEmpty)
                       SizedBox(
                         height: cartItemsHeight,
@@ -1031,6 +1073,7 @@ class _SaleViewState extends State<_SaleView> {
                               : () => widget.onFinish(
                                   _customer.text.trim(),
                                   _payment,
+                                  _installments,
                                 ),
                           icon: const Icon(Icons.check),
                           label: const Text('Finalizar venda'),
