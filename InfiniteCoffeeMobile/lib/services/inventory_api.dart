@@ -177,6 +177,66 @@ class InventoryApi {
         .cast<Map<String, dynamic>>();
   }
 
+  Future<void> updateProduct({
+    required int productId,
+    required String name,
+    required String description,
+    required String barcode,
+    required String type,
+    required double price,
+  }) async {
+    final response = await _client
+        .put(
+          Uri.parse('$writeBaseUrl/api/produtos/$productId'),
+          headers: _headers({'Content-Type': 'application/json'}, true),
+          body: jsonEncode({
+            'nome': name,
+            'descricao': description,
+            'codigoBarras': barcode,
+            'tipo': type,
+            'preco': price,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw ApiException(
+          '${body['mensagem'] ?? 'Nao foi possivel atualizar o produto.'}',
+          response.statusCode,
+        );
+      } on FormatException {
+        throw ApiException(
+          'A API retornou o erro ${response.statusCode}.',
+          response.statusCode,
+        );
+      }
+    }
+  }
+
+  Future<void> deleteProduct(int productId) async {
+    final response = await _client
+        .delete(
+          Uri.parse('$writeBaseUrl/api/produtos/$productId'),
+          headers: _headers(null, true),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw ApiException(
+          '${body['mensagem'] ?? 'Nao foi possivel excluir o produto.'}',
+          response.statusCode,
+        );
+      } on FormatException {
+        throw ApiException(
+          'A API retornou o erro ${response.statusCode}.',
+          response.statusCode,
+        );
+      }
+    }
+  }
+
   Future<void> createProduct({
     required String name,
     required String description,
@@ -200,7 +260,18 @@ class InventoryApi {
         )
         .timeout(const Duration(seconds: 60));
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw const ApiException('Nao foi possivel cadastrar o produto.');
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw ApiException(
+          '${body['mensagem'] ?? 'Nao foi possivel cadastrar o produto.'}',
+          response.statusCode,
+        );
+      } on FormatException {
+        throw ApiException(
+          'A API retornou o erro ${response.statusCode}.',
+          response.statusCode,
+        );
+      }
     }
   }
 }

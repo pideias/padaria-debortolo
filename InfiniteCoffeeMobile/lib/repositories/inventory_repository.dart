@@ -56,6 +56,38 @@ class InventoryRepository {
   Future<List<Map<String, dynamic>>> getSalesHistory() =>
       _api.getSalesHistory();
 
+  Future<ExitResult> updateProduct({
+    required Product product,
+    required String name,
+    required String description,
+    required String barcode,
+    required String type,
+    required double price,
+  }) async {
+    try {
+      await _api.updateProduct(
+        productId: product.id,
+        name: name,
+        description: description,
+        barcode: barcode,
+        type: type,
+        price: price,
+      );
+      return const ExitResult(true, 'Produto atualizado com sucesso.');
+    } catch (error) {
+      return ExitResult(false, _errorMessage(error));
+    }
+  }
+
+  Future<ExitResult> deleteProduct(Product product) async {
+    try {
+      await _api.deleteProduct(product.id);
+      return const ExitResult(true, 'Produto excluído com sucesso.');
+    } catch (error) {
+      return ExitResult(false, _errorMessage(error));
+    }
+  }
+
   Future<ExitResult> createSale({
     required String customer,
     required String payment,
@@ -182,6 +214,12 @@ class InventoryRepository {
     required double price,
     required int quantity,
   }) async {
+    if (name.trim().isEmpty || type.trim().isEmpty || price <= 0) {
+      return const ExitResult(false, 'Informe nome, tipo e um preco valido.');
+    }
+    if (quantity < 0) {
+      return const ExitResult(false, 'A quantidade nao pode ser negativa.');
+    }
     try {
       await _api.createProduct(
         name: name,
@@ -192,10 +230,12 @@ class InventoryRepository {
         quantity: quantity,
       );
       return const ExitResult(true, 'Produto cadastrado com sucesso.');
-    } catch (_) {
-      return const ExitResult(
+    } catch (error) {
+      return ExitResult(
         false,
-        'Cadastros de produtos exigem conexão com o servidor.',
+        error is ApiException
+            ? error.message
+            : 'Nao foi possivel conectar ao servidor.',
       );
     }
   }
