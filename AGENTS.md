@@ -11,6 +11,7 @@ Estas regras valem para todo trabalho neste repositorio.
 - A `CdmEdu` e a fonte oficial do HTML e do visual do sistema.
 - Somente a `CdmEdu` pode criar ou alterar HTML, Views Razor, CSS e componentes visuais; outras branches devem receber essas mudancas por merge.
 - Acesso ao SQL Server centralizado em `InfiniteCoffee2/Data/Banco.cs`.
+- Cada maquina pode usar um servidor SQL diferente; prefira `PADARIA_CONNECTION_STRING` e nunca versione uma conexao local especifica.
 - O banco usa procedures armazenadas e chaves estrangeiras para manter integridade.
 
 ## Regras de desenvolvimento
@@ -57,7 +58,8 @@ Estas regras valem para todo trabalho neste repositorio.
 - O projeto Flutter fica em `InfiniteCoffeeMobile` e deve permanecer separado do MVC.
 - O backend continua em ASP.NET Core .NET 10.
 - A API do ambiente demonstrativo deve permanecer pública (`PADARIA_PUBLIC_API=true`):
-  APK, desktop e web não exigem `X-Api-Key` nem tokens embutidos no aplicativo.
+  APK, desktop e web não exigem `X-Api-Key` nem tokens embutidos no aplicativo. Credenciais
+  do Google Drive e demais segredos devem permanecer exclusivamente no backend.
 - O SQL Server permanece como fonte oficial dos dados.
 - Operacoes offline devem ser persistidas localmente e sincronizadas depois.
 - Nunca confirme uma venda sem revalidar o estoque no backend.

@@ -1,12 +1,40 @@
+@model InfiniteCoffee2.Models.ConfirmacaoAtendimentoViewModel
 @{ ViewBag.Title = "Atendimento Finalizado"; }
 
-<div class="text-center mt-5">
-    <h1>✅</h1>
-    <h2>Atendimento Finalizado!</h2>
-    @if (TempData["Mensagem"] != null)
-    {
-        <p class="text-success fs-5">@TempData["Mensagem"]</p>
-    }
-    <a href="/Atendimento" class="btn btn-primary mt-3">Novo Atendimento</a>
-    <a href="/" class="btn btn-secondary mt-3">Voltar ao Início</a>
+<div class="confirmation-page">
+    <div class="confirmation-card card p-4 p-md-5">
+        <div class="confirmation-icon">✓</div>
+        <p class="eyebrow mb-1">pedido recebido</p>
+        <h1>Atendimento finalizado!</h1>
+        <p class="text-muted">Obrigado por escolher a Padaria Debortolo.</p>
+
+        <div class="confirmation-meta">
+            <div><span>Pedido</span><strong>#@Model.PedidoId</strong></div>
+            <div><span>Mesa</span><strong>@Model.Mesa</strong></div>
+            <div><span>Pagamento</span><strong>@Model.FormaPagamento</strong></div>
+        </div>
+
+        <div class="confirmation-customer">
+            <span>Cliente</span>
+            <strong>@Model.ClienteNome</strong>
+            <small>@Model.ClienteEmail</small>
+        </div>
+
+        <div class="confirmation-items">
+            <h3>Resumo do pedido</h3>
+            @foreach (var item in Model.Itens)
+            {
+                <div class="d-flex justify-content-between border-bottom py-2">
+                    <span>@item.Quantidade x @item.Nome</span>
+                    <strong>R$ @item.Subtotal</strong>
+                </div>
+            }
+            <div class="d-flex justify-content-between mt-3"><span>Total</span><strong class="fs-4 text-success">R$ @Model.Total</strong></div>
+        </div>
+
+        <div class="confirmation-actions">
+            <a href="/Atendimento" class="btn btn-primary">Iniciar novo atendimento</a>
+            <a href="/" class="btn btn-outline-secondary">Voltar ao início</a>
+        </div>
+    </div>
 </div>

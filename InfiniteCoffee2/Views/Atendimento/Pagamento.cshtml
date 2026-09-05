@@ -1,29 +1,60 @@
-@{ ViewBag.Title = "Pagamento"; }
+@{
+    ViewBag.Title = "Revisão e Pagamento";
+    var itensPedido = (List<Dictionary<string, object>>)ViewBag.ItensPedido;
+}
 
-<h2>Pagamento</h2>
-<p class="text-muted">Pedido #@ViewBag.PedidoId</p>
+<h2>Revisão do pedido</h2>
+<p class="text-muted">Confira seus itens antes de escolher o pagamento. Pedido #@ViewBag.PedidoId</p>
 
-<div class="card p-4" style="max-width: 400px;">
-    <h4>Total: <strong class="text-success">R$ @ViewBag.Total</strong></h4>
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card p-4">
+            <p class="eyebrow mb-1">conferência</p>
+            <h3>Itens escolhidos</h3>
+            @foreach (var item in itensPedido)
+            {
+                <div class="d-flex justify-content-between align-items-center border-bottom py-3">
+                    <div><strong>@item["nome_produto"]</strong><br /><span class="text-muted">@item["quantidade"] x R$ @item["preco_unitario"]</span></div>
+                    <strong>R$ @item["subtotal"]</strong>
+                </div>
+            }
+            <div class="d-flex justify-content-between align-items-center mt-4"><span class="fs-5">Total do pedido</span><strong class="fs-3 text-success">R$ @ViewBag.Total</strong></div>
+            <a href="/Atendimento/AdicionarItens" class="btn btn-outline-secondary mt-4">Voltar ao cardápio</a>
+        </div>
+    </div>
 
-    <form method="post" action="/Atendimento/Finalizar">
-        <div class="mb-3 mt-3">
-            <label class="form-label">Forma de Pagamento</label>
-            <div class="d-flex gap-2">
-                <div class="form-check">
+    <div class="col-lg-5">
+        <div class="card p-4">
+            <p class="eyebrow mb-1">último passo</p>
+            <h3>Forma de pagamento</h3>
+            <p class="text-muted">Esta etapa é uma simulação.</p>
+            <form method="post" action="/Atendimento/Finalizar">
+                <div class="form-check p-3 border rounded mb-2">
                     <input class="form-check-input" type="radio" name="forma" value="Dinheiro" id="dinheiro" checked />
                     <label class="form-check-label" for="dinheiro">Dinheiro</label>
                 </div>
-                <div class="form-check">
+                <div class="form-check p-3 border rounded mb-2">
                     <input class="form-check-input" type="radio" name="forma" value="Cartão" id="cartao" />
                     <label class="form-check-label" for="cartao">Cartão</label>
                 </div>
-                <div class="form-check">
+                <div class="form-check p-3 border rounded mb-4">
                     <input class="form-check-input" type="radio" name="forma" value="Pix" id="pix" />
                     <label class="form-check-label" for="pix">Pix</label>
                 </div>
-            </div>
+                <button type="submit" class="btn btn-success w-100">Confirmar pedido</button>
+            </form>
+            <form method="post" action="/Atendimento/Cancelar" class="mt-2 atendimento-navigation-form"><button type="submit" class="btn btn-outline-secondary w-100">Cancelar atendimento</button></form>
         </div>
-        <button type="submit" class="btn btn-success w-100">Finalizar Atendimento</button>
-    </form>
+    </div>
 </div>
+
+<script>
+    (() => {
+        let navegando = false;
+        document.addEventListener('click', event => { if (event.target.closest('a')) navegando = true; });
+        document.addEventListener('submit', () => { navegando = true; });
+        window.addEventListener('pagehide', () => {
+            if (!navegando && navigator.sendBeacon) navigator.sendBeacon('/Atendimento/Cancelar');
+        });
+    })();
+</script>
