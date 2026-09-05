@@ -62,7 +62,10 @@ namespace InfiniteCoffee2
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            // O Render termina o HTTPS no proxy e encaminha HTTP para o container.
+            // Redirecionar novamente dentro do container gera aviso e nao e necessario.
+            if (app.Environment.IsDevelopment())
+                app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseRouting();
             app.UseMiddleware<ApiKeyMiddleware>();
