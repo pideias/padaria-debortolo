@@ -539,7 +539,9 @@ namespace InfiniteCoffee2.Data
                     using var baixa = new SqlCommand("UPDATE Produtos SET quantidade_estoque = quantidade_estoque - @quantidade WHERE id_produto = @produto AND quantidade_estoque >= @quantidade", conn, transaction);
                     baixa.Parameters.AddWithValue("@produto", item.ProdutoId);
                     baixa.Parameters.AddWithValue("@quantidade", item.Quantidade);
-                    if (baixa.ExecuteNonQuery() != 1) return 0;
+                    // O trigger de sincronização também atualiza a linha e pode
+                    // fazer o SQL Server reportar mais de uma linha afetada.
+                    if (baixa.ExecuteNonQuery() < 1) return 0;
                     using var itemCommand = new SqlCommand("INSERT INTO Itens_Pedidos (pedidoid, produtoid, quantidade, preco_unitario) VALUES (@pedido, @produto, @quantidade, @preco)", conn, transaction);
                     itemCommand.Parameters.AddWithValue("@pedido", pedidoId);
                     itemCommand.Parameters.AddWithValue("@produto", item.ProdutoId);
