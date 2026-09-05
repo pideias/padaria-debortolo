@@ -179,8 +179,7 @@ flutter run -d emulator-5554
 - O instalador nao contem tokens, senhas, credenciais OAuth ou strings de conexao com
   credenciais.
 - As APIs estao publicas para o trabalho demonstrativo: nao exigem mais `X-Api-Key` no
-  mobile, desktop ou web. A credencial do Google Drive continua somente no servidor e nao
-  deve ser distribuida nos aplicativos.
+  mobile, desktop ou web.
 - O Render usa `PADARIA_PUBLIC_API=true` no ambiente demonstrativo para permitir que APK e
   desktop de teste acessem a API sem embutir tokens. Em producao, desative essa variavel e
   use tokens de leitura e escrita separados.
@@ -193,12 +192,7 @@ flutter run -d emulator-5554
   segundos para permitir o despertar da instancia gratuita.
 - No modo demonstrativo, o mobile mantém uma cópia local persistente dos produtos, atualiza
   o saldo imediatamente após entrada/saída e mantém operações pendentes para sincronização
-  posterior pela API. O Google Drive recebe somente uma cópia do SQL Server.
-- O Render em `PADARIA_SNAPSHOT_ONLY=false` e a API central de leitura e escrita. O arquivo
-  do Google Drive nunca e a fonte de escrita.
-- A API central publica o snapshot do SQL Server no Drive a cada 30 minutos. O mobile e o
-  desktop chamam `POST /api/estoque/backup`; nenhuma credencial do Google Drive e distribuida
-  nos aplicativos.
+  posterior pela API. O SQL Server é a fonte oficial.
 - O desktop e o APK usam por padrao a API central no Render. O backend local continua
   disponivel somente para desenvolvimento, mediante `API_BASE_URL` explicito.
 - Para compilar APK e Windows automaticamente, use `Installer/Build-Apps.ps1`. O script lê
@@ -225,11 +219,8 @@ flutter run -d emulator-5554
   caches removam o item sem apagar o historico no SQL Server.
 - O PDV envia uma venda unica para `/api/vendas`, deixando o servidor calcular o total e
   executar pedido, itens, pagamento e baixa na mesma transacao.
-- O Render deve executar a API central com `PADARIA_SNAPSHOT_ONLY=false`, receber a string
-  de conexao por segredo (`PADARIA_CONNECTION_STRING`) e o JSON completo da conta de serviço em
-  `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`. Compartilhe a pasta do Drive com o e-mail da conta de
-  serviço. O Google Drive continua somente como destino de backup/snapshot e é acessado apenas
-  pelo backend via API.
+- O Render deve executar a API central com a string de conexao por segredo
+  (`PADARIA_CONNECTION_STRING`). A API consulta e altera diretamente o SQL Server.
 - Para hospedar o SQL Server fora do PC local, use uma VM x86/AMD da Oracle Cloud conforme
   `OracleCloud/README.md`. O Render recebe o IP publico e a senha apenas em
   `PADARIA_CONNECTION_STRING`; nenhuma credencial deve entrar no repositorio.

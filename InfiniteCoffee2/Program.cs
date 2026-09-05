@@ -1,6 +1,5 @@
 using InfiniteCoffee2.Data;
 using InfiniteCoffee2.Middleware;
-using InfiniteCoffee2.Services;
 
 namespace InfiniteCoffee2
 {
@@ -10,19 +9,11 @@ namespace InfiniteCoffee2
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            var snapshotOnly = string.Equals(
-                Environment.GetEnvironmentVariable("PADARIA_SNAPSHOT_ONLY"), "true", StringComparison.OrdinalIgnoreCase);
-            if (!snapshotOnly)
-            {
-                Banco.Configurar(
-                    Environment.GetEnvironmentVariable("PADARIA_CONNECTION_STRING") ??
-                    builder.Configuration.GetConnectionString("DefaultConnection"));
-            }
+            Banco.Configurar(
+                Environment.GetEnvironmentVariable("PADARIA_CONNECTION_STRING") ??
+                builder.Configuration.GetConnectionString("DefaultConnection"));
 
             builder.Services.AddControllersWithViews();
-            builder.Services.AddSingleton<GoogleDriveSnapshotHostedService>();
-            builder.Services.AddHostedService(provider => provider.GetRequiredService<GoogleDriveSnapshotHostedService>());
-            builder.Services.AddHttpClient<GoogleDriveSnapshotStore>();
             builder.Services.AddCors(options =>
             {
                 // O trabalho demonstrativo usa a API a partir do web, desktop e mobile.

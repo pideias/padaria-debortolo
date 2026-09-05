@@ -6,19 +6,9 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
-      - key: PADARIA_SNAPSHOT_ONLY
-        value: "false"
       - key: PADARIA_PUBLIC_API
         value: "true"
       - key: PADARIA_CONNECTION_STRING
         sync: false
       - key: PADARIA_API_TOKEN
         sync: false
-      - key: GOOGLE_DRIVE_SNAPSHOT_FILE_ID
-        sync: false
-      - key: GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON
-        sync: false
-      - key: GOOGLE_DRIVE_FOLDER_ID
-        sync: false
-      - key: GOOGLE_DRIVE_SNAPSHOT_NAME
-        value: "estoque.json"

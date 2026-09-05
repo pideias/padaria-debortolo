@@ -9,7 +9,6 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3373" />
 	</ItemGroup>
 
 </Project>

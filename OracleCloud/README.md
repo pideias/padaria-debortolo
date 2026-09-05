@@ -61,9 +61,7 @@ Server=IP_PUBLICO_DA_VM,1433;Database=infiniteCoffee;User Id=sa;Password=SENHA_S
 Nao use `localhost`, `Trusted_Connection=True` ou a senha no Git. Reinicie o servico do
 Render depois de salvar a variavel.
 
-O `render.yaml` ja declara `PADARIA_CONNECTION_STRING` como segredo. O Google Drive continua
-configurado somente no Render, por `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` e
-`GOOGLE_DRIVE_FOLDER_ID`.
+O `render.yaml` ja declara `PADARIA_CONNECTION_STRING` como segredo.
 
 ## Validacao
 
@@ -71,6 +69,6 @@ configurado somente no Render, por `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` e
 2. Confira `GET /api/estoque`.
 3. Registre uma entrada de estoque pelo app.
 4. Confirme a movimentacao no SQL Server da VM.
-5. Confirme o snapshot no Google Drive.
+5. Confirme o estoque pela API.
 
 Nao exponha a porta 1433 antes de configurar senha forte, atualizacoes e as regras da VCN.

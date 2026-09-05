@@ -53,8 +53,6 @@ class InventoryRepository {
     return load(search: search);
   }
 
-  Future<void> backup() => _api.backup();
-
   Future<List<Map<String, dynamic>>> getSalesHistory() =>
       _api.getSalesHistory();
 

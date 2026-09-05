@@ -57,8 +57,7 @@ Estas regras valem para todo trabalho neste repositorio.
 - O projeto Flutter fica em `InfiniteCoffeeMobile` e deve permanecer separado do MVC.
 - O backend continua em ASP.NET Core .NET 10.
 - A API do ambiente demonstrativo deve permanecer pública (`PADARIA_PUBLIC_API=true`):
-  APK, desktop e web não exigem `X-Api-Key` nem tokens embutidos no aplicativo. Credenciais
-  do Google Drive e demais segredos devem permanecer exclusivamente no backend.
+  APK, desktop e web não exigem `X-Api-Key` nem tokens embutidos no aplicativo.
 - O SQL Server permanece como fonte oficial dos dados.
 - Operacoes offline devem ser persistidas localmente e sincronizadas depois.
 - Nunca confirme uma venda sem revalidar o estoque no backend.

@@ -33,7 +33,7 @@ class InventoryApi {
     return _configuredBaseUrl.replaceFirst(RegExp(r'/$'), '');
   }
 
-  // Escritas e backup precisam chegar ao servidor que acessa o SQL Server.
+  // Escritas precisam chegar ao servidor que acessa o SQL Server.
   String get writeBaseUrl {
     if (_configuredWriteBaseUrl.trim().isNotEmpty) {
       return _configuredWriteBaseUrl.replaceFirst(RegExp(r'/$'), '');
@@ -196,22 +196,6 @@ class InventoryApi {
         .timeout(const Duration(seconds: 60));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw const ApiException('Nao foi possivel cadastrar o produto.');
-    }
-  }
-
-  Future<void> backup() async {
-    final response = await _client
-        .post(
-          Uri.parse('$writeBaseUrl/api/estoque/backup'),
-          headers: _headers(null, true),
-        )
-        .timeout(const Duration(seconds: 60));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        '${body['mensagem'] ?? 'Nao foi possivel enviar o backup.'}',
-        response.statusCode,
-      );
     }
   }
 }

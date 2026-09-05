@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../repositories/inventory_repository.dart';
-import '../services/inventory_api.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.repository});
@@ -87,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 onEntry: _registerEntry,
                 onCreateProduct: _showProductDialog,
                 onSync: _syncNow,
-                onBackup: _backupNow,
               )
             : _selectedIndex == 3
             ? _SaleView(
@@ -108,16 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Padaria Debortolo'),
         toolbarHeight: desktop ? 76 : null,
         actions: [
-          IconButton(
-            onPressed: _syncNow,
-            tooltip: 'Sincronizar com o Google Drive',
-            icon: const Icon(Icons.sync),
-          ),
-          IconButton(
-            onPressed: _sendToDrive,
-            tooltip: 'Enviar alterações para o Google Drive',
-            icon: const Icon(Icons.cloud_upload_outlined),
-          ),
           if (desktop)
             const Padding(
               padding: EdgeInsets.only(left: 8, right: 24),
@@ -195,34 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _syncNow() async {
-    await _runSync('Sincronizacao concluida.');
-  }
-
-  Future<void> _sendToDrive() async {
-    await _runSync('Alteracoes enviadas para o Google Drive.');
-  }
-
-  Future<void> _backupNow() async {
-    try {
-      await widget.repository.backup();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup enviado para o Google Drive.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is ApiException
-                  ? error.message
-                  : 'Nao foi possivel enviar o backup.',
-            ),
-          ),
-        );
-      }
-    }
+    await _runSync('Banco de dados atualizado.');
   }
 
   Future<void> _runSync(String successMessage) async {
@@ -653,7 +614,6 @@ class _StockView extends StatelessWidget {
     required this.onEntry,
     required this.onCreateProduct,
     required this.onSync,
-    required this.onBackup,
   });
   final List<Product> products;
   final bool offline;
@@ -664,7 +624,6 @@ class _StockView extends StatelessWidget {
   final ValueChanged<Product> onEntry;
   final VoidCallback onCreateProduct;
   final VoidCallback onSync;
-  final VoidCallback onBackup;
 
   @override
   Widget build(BuildContext context) {
@@ -682,12 +641,7 @@ class _StockView extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onSync,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Atualizar'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: onBackup,
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('Backup no Google Drive'),
+                  label: const Text('Atualizar banco'),
                 ),
                 ElevatedButton.icon(
                   onPressed: onCreateProduct,
