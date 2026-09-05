@@ -283,44 +283,57 @@ class _HomeScreenState extends State<HomeScreen> {
     final created = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         title: const Text('Cadastrar produto'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: 'Nome'),
-              ),
-              TextField(
-                controller: description,
-                decoration: const InputDecoration(labelText: 'Descrição'),
-              ),
-              TextField(
-                controller: barcode,
-                decoration: const InputDecoration(
-                  labelText: 'Código de barras',
+        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Nome'),
                 ),
-              ),
-              TextField(
-                controller: price,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Preço'),
-              ),
-              TextField(
-                controller: quantity,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Quantidade inicial',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: description,
+                  decoration: const InputDecoration(labelText: 'Descrição'),
                 ),
-              ),
-              TextField(
-                controller: type,
-                decoration: const InputDecoration(labelText: 'Categoria/tipo'),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: barcode,
+                  decoration: const InputDecoration(
+                    labelText: 'Código de barras',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: price,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Preço'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: quantity,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantidade inicial',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: type,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoria/tipo',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
