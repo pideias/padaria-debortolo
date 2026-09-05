@@ -42,5 +42,9 @@ class Product {
 
   static int _int(Object? value) => int.tryParse('$value') ?? 0;
   static double _double(Object? value) => double.tryParse('$value') ?? 0;
-  static String? _text(Object? value) => value == null ? null : '$value';
+  static String? _text(Object? value) {
+    if (value == null || value is Map && value.isEmpty) return null;
+    final text = '$value'.trim();
+    return text.isEmpty || text == '{}' ? null : text;
+  }
 }

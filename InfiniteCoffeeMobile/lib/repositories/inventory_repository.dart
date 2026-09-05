@@ -53,17 +53,16 @@ class InventoryRepository {
     return load(search: search);
   }
 
-  Future<void> backup() => _api.backup();
-
   Future<List<Map<String, dynamic>>> getSalesHistory() =>
       _api.getSalesHistory();
 
   Future<ExitResult> createSale({
+    required String customer,
     required String payment,
     required List<Map<String, int>> items,
   }) async {
     try {
-      await _api.createSale(payment: payment, items: items);
+      await _api.createSale(customer: customer, payment: payment, items: items);
       return const ExitResult(true, 'Venda finalizada com sucesso.');
     } catch (error) {
       if (!_isRetryable(error)) {
@@ -75,6 +74,7 @@ class InventoryRepository {
         jsonEncode({
           'tipo': 'venda',
           'clientUuid': _clientUuid(),
+          'clienteNome': customer,
           'formaPagamento': payment,
           'itens': items,
         }),

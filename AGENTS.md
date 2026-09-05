@@ -82,6 +82,8 @@ Estas regras valem para todo trabalho neste repositorio.
 - Rede: app Windows usa `http://localhost:5049`; app mobile na mesma LAN usa o IP da maquina
   (ex.: `http://192.168.x.x:5049`). O CORS em `Program.cs` deve liberar essa origem.
 - SQL Server continua sendo a fonte da verdade; Hive no app e um espelho offline.
+- O banco remoto de producao/demonstracao pode ser hospedado em uma VM x86 da Oracle Cloud;
+  use `OracleCloud/README.md` e nunca coloque senha na connection string versionada.
 
 ## Preservacao de historico
 

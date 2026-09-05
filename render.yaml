@@ -14,11 +14,3 @@ services:
         sync: false
       - key: PADARIA_API_TOKEN
         sync: false
-      - key: GOOGLE_DRIVE_SNAPSHOT_FILE_ID
-        sync: false
-      - key: GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON
-        sync: false
-      - key: GOOGLE_DRIVE_FOLDER_ID
-        sync: false
-      - key: GOOGLE_DRIVE_SNAPSHOT_NAME
-        value: "estoque.json"

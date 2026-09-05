@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../repositories/inventory_repository.dart';
-import '../services/inventory_api.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.repository});
@@ -87,7 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 onEntry: _registerEntry,
                 onCreateProduct: _showProductDialog,
                 onSync: _syncNow,
-                onBackup: _backupNow,
               )
             : _selectedIndex == 3
             ? _SaleView(
@@ -108,16 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Padaria Debortolo'),
         toolbarHeight: desktop ? 76 : null,
         actions: [
-          IconButton(
-            onPressed: _syncNow,
-            tooltip: 'Sincronizar com o Google Drive',
-            icon: const Icon(Icons.sync),
-          ),
-          IconButton(
-            onPressed: _sendToDrive,
-            tooltip: 'Enviar alterações para o Google Drive',
-            icon: const Icon(Icons.cloud_upload_outlined),
-          ),
           if (desktop)
             const Padding(
               padding: EdgeInsets.only(left: 8, right: 24),
@@ -195,34 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _syncNow() async {
-    await _runSync('Sincronizacao concluida.');
-  }
-
-  Future<void> _sendToDrive() async {
-    await _runSync('Alteracoes enviadas para o Google Drive.');
-  }
-
-  Future<void> _backupNow() async {
-    try {
-      await widget.repository.backup();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup enviado para o Google Drive.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is ApiException
-                  ? error.message
-                  : 'Nao foi possivel enviar o backup.',
-            ),
-          ),
-        );
-      }
-    }
+    await _runSync('Banco de dados atualizado.');
   }
 
   Future<void> _runSync(String successMessage) async {
@@ -291,6 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _finishSale(String customer, String payment) async {
     if (_cart.isEmpty) return;
     final result = await widget.repository.createSale(
+      customer: customer,
       payment: payment,
       items: _cart.values
           .map(
@@ -303,15 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final success = result.success;
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Venda finalizada com sucesso.'
-              : 'A venda não pôde ser finalizada.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(result.message)));
     if (success) {
       setState(() => _cart.clear());
       _reload();
@@ -328,44 +283,57 @@ class _HomeScreenState extends State<HomeScreen> {
     final created = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         title: const Text('Cadastrar produto'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: 'Nome'),
-              ),
-              TextField(
-                controller: description,
-                decoration: const InputDecoration(labelText: 'Descrição'),
-              ),
-              TextField(
-                controller: barcode,
-                decoration: const InputDecoration(
-                  labelText: 'Código de barras',
+        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Nome'),
                 ),
-              ),
-              TextField(
-                controller: price,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Preço'),
-              ),
-              TextField(
-                controller: quantity,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Quantidade inicial',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: description,
+                  decoration: const InputDecoration(labelText: 'Descrição'),
                 ),
-              ),
-              TextField(
-                controller: type,
-                decoration: const InputDecoration(labelText: 'Categoria/tipo'),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: barcode,
+                  decoration: const InputDecoration(
+                    labelText: 'Código de barras',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: price,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Preço'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: quantity,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantidade inicial',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: type,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoria/tipo',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -653,7 +621,6 @@ class _StockView extends StatelessWidget {
     required this.onEntry,
     required this.onCreateProduct,
     required this.onSync,
-    required this.onBackup,
   });
   final List<Product> products;
   final bool offline;
@@ -664,7 +631,6 @@ class _StockView extends StatelessWidget {
   final ValueChanged<Product> onEntry;
   final VoidCallback onCreateProduct;
   final VoidCallback onSync;
-  final VoidCallback onBackup;
 
   @override
   Widget build(BuildContext context) {
@@ -682,12 +648,7 @@ class _StockView extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onSync,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Atualizar'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: onBackup,
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('Backup no Google Drive'),
+                  label: const Text('Atualizar banco'),
                 ),
                 ElevatedButton.icon(
                   onPressed: onCreateProduct,
@@ -915,7 +876,14 @@ class _SaleViewState extends State<_SaleView> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'Pix', child: Text('Pix')),
-                    DropdownMenuItem(value: 'Cartão', child: Text('Cartão')),
+                    DropdownMenuItem(
+                      value: 'Cartão de crédito',
+                      child: Text('Cartão de crédito'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Cartão de débito',
+                      child: Text('Cartão de débito'),
+                    ),
                     DropdownMenuItem(
                       value: 'Dinheiro',
                       child: Text('Dinheiro'),
@@ -1005,6 +973,7 @@ class _SalesHistory extends StatelessWidget {
                 leading: const Icon(Icons.receipt_long),
                 title: Text('Pedido #${sale['id_pedido']}'),
                 subtitle: Text(
+                  '${sale['cliente_nome'] ?? 'Cliente não informado'} • '
                   '${sale['forma_pagamento']} • ${sale['itens']} item(ns)',
                 ),
                 trailing: Text('R\$ ${value.toStringAsFixed(2)}'),
