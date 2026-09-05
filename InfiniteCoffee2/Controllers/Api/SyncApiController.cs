@@ -62,12 +62,13 @@ public sealed class SyncApiController : ControllerBase
                 {
                     "saida" => Banco.RegistrarSaidaEstoque(op.GetInt("produtoId"), op.GetInt("quantidade"), op.GetString("motivo") ?? "Ajuste"),
                     "entrada" => Banco.RegistrarEntradaEstoque(op.GetInt("produtoId"), op.GetInt("quantidade"), op.GetString("motivo") ?? "Reposição"),
-                    "venda" => Banco.FinalizarVenda(
+                        "venda" => Banco.FinalizarVenda(
                         op.GetNullableInt("clienteId"),
                         op.GetNullableInt("mesaId"),
                         op.GetNullableInt("funcionarioId"),
                         op.GetString("formaPagamento") ?? "Pix",
-                        op.GetItens("itens")) > 0,
+                        op.GetItens("itens"),
+                        op.GetString("clienteNome")) > 0,
                     _ => false
                 };
 

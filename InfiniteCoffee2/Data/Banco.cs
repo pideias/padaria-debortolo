@@ -425,8 +425,10 @@ namespace InfiniteCoffee2.Data
                 SELECT TOP (@limite) p.id_pedido, p.datahora, p.status_pedido,
                        ISNULL(MAX(pg.forma_pagamento), '') AS forma_pagamento,
                        ISNULL(MAX(pg.valor_total), 0) AS valor_total,
+                       ISNULL(MAX(c.nome_cliente), 'Cliente não informado') AS cliente_nome,
                        COUNT(i.id_itens_pedidos) AS itens
                 FROM Pedidos p
+                LEFT JOIN Clientes c ON c.id_cliente = p.clienteid
                 LEFT JOIN Pagamentos pg ON pg.pedidoid = p.id_pedido
                 LEFT JOIN Itens_Pedidos i ON i.pedidoid = p.id_pedido
                 GROUP BY p.id_pedido, p.datahora, p.status_pedido
@@ -442,12 +444,13 @@ namespace InfiniteCoffee2.Data
                     ["status_pedido"] = reader["status_pedido"],
                     ["forma_pagamento"] = reader["forma_pagamento"],
                     ["valor_total"] = reader["valor_total"],
+                    ["cliente_nome"] = reader["cliente_nome"],
                     ["itens"] = reader["itens"]
                 });
             return lista;
         }
 
-        public static int FinalizarVenda(int? clienteId, int? mesaId, int? funcionarioId, string formaPagamento, IEnumerable<SaleItemData> itens)
+        public static int FinalizarVenda(int? clienteId, int? mesaId, int? funcionarioId, string formaPagamento, IEnumerable<SaleItemData> itens, string? clienteNome = null)
         {
             GarantirTabelaMovimentacoes();
             using var conn = new SqlConnection(connectionString);
@@ -458,8 +461,24 @@ namespace InfiniteCoffee2.Data
                 var itemList = itens.ToList();
                 if (itemList.Count == 0) return 0;
 
+                if (!clienteId.HasValue && !string.IsNullOrWhiteSpace(clienteNome))
+                {
+                    using var cliente = new SqlCommand(
+                        "SELECT TOP 1 id_cliente FROM Clientes WHERE nome_cliente = @nome;",
+                        conn, transaction);
+                    cliente.Parameters.AddWithValue("@nome", clienteNome.Trim());
+                    var existente = cliente.ExecuteScalar();
+                    if (existente is not null)
+                        clienteId = Convert.ToInt32(existente);
+                    else
+                    {
+                        cliente.CommandText = "INSERT INTO Clientes (nome_cliente) OUTPUT INSERTED.id_cliente VALUES (@nome);";
+                        clienteId = Convert.ToInt32(cliente.ExecuteScalar());
+                    }
+                }
+
                 using var pedido = new SqlCommand("INSERT INTO Pedidos (mesaid, funcionarioid, clienteid, datahora, status_pedido) OUTPUT INSERTED.id_pedido VALUES (@mesa, @funcionario, @cliente, GETDATE(), 'Finalizado')", conn, transaction);
-                pedido.Parameters.AddWithValue("@mesa", clienteId.HasValue && mesaId.HasValue ? mesaId.Value : DBNull.Value);
+                pedido.Parameters.AddWithValue("@mesa", mesaId.HasValue ? mesaId.Value : DBNull.Value);
                 pedido.Parameters.AddWithValue("@funcionario", funcionarioId.HasValue ? funcionarioId.Value : DBNull.Value);
                 pedido.Parameters.AddWithValue("@cliente", clienteId.HasValue ? clienteId.Value : DBNull.Value);
                 var pedidoId = Convert.ToInt32(pedido.ExecuteScalar());

@@ -252,6 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _finishSale(String customer, String payment) async {
     if (_cart.isEmpty) return;
     final result = await widget.repository.createSale(
+      customer: customer,
       payment: payment,
       items: _cart.values
           .map(
@@ -264,15 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final success = result.success;
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Venda finalizada com sucesso.'
-              : 'A venda não pôde ser finalizada.',
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(result.message)));
     if (success) {
       setState(() => _cart.clear());
       _reload();
@@ -959,6 +953,7 @@ class _SalesHistory extends StatelessWidget {
                 leading: const Icon(Icons.receipt_long),
                 title: Text('Pedido #${sale['id_pedido']}'),
                 subtitle: Text(
+                  '${sale['cliente_nome'] ?? 'Cliente não informado'} • '
                   '${sale['forma_pagamento']} • ${sale['itens']} item(ns)',
                 ),
                 trailing: Text('R\$ ${value.toStringAsFixed(2)}'),

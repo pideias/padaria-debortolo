@@ -136,6 +136,7 @@ class InventoryApi {
   }
 
   Future<void> createSale({
+    required String customer,
     required String payment,
     required List<Map<String, int>> items,
   }) async {
@@ -143,7 +144,11 @@ class InventoryApi {
         .post(
           Uri.parse('$writeBaseUrl/api/vendas'),
           headers: _headers({'Content-Type': 'application/json'}, true),
-          body: jsonEncode({'formaPagamento': payment, 'itens': items}),
+          body: jsonEncode({
+            'clienteNome': customer,
+            'formaPagamento': payment,
+            'itens': items,
+          }),
         )
         .timeout(const Duration(seconds: 60));
     if (response.statusCode < 200 || response.statusCode >= 300) {

@@ -17,7 +17,7 @@ public sealed class VendasApiController : ControllerBase
         if (request.Itens.Any(item => item.Quantidade < 1))
             return BadRequest(new { mensagem = "As quantidades devem ser maiores que zero." });
 
-        var pedidoId = Banco.FinalizarVenda(request.ClienteId, request.MesaId, request.FuncionarioId, request.FormaPagamento, request.Itens);
+        var pedidoId = Banco.FinalizarVenda(request.ClienteId, request.MesaId, request.FuncionarioId, request.FormaPagamento, request.Itens, request.ClienteNome);
         return pedidoId == 0
             ? BadRequest(new { mensagem = "Não foi possível finalizar. Verifique os produtos e o estoque." })
             : StatusCode(StatusCodes.Status201Created, new { pedidoId, mensagem = "Venda finalizada com sucesso." });
@@ -27,6 +27,7 @@ public sealed class VendasApiController : ControllerBase
 public sealed class CriarVendaRequest
 {
     public int? ClienteId { get; set; }
+    public string? ClienteNome { get; set; }
     public int? MesaId { get; set; }
     public int? FuncionarioId { get; set; }
     public string FormaPagamento { get; set; } = string.Empty;
