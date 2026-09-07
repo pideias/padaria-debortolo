@@ -1,0 +1,21 @@
+PADARIA DEBORTOLO - SISTEMA DE ESTOQUE E VENDAS
+================================================
+
+O QUE ESTE PROGRAMA PRECISA
+- Uma conexao com a internet na primeira abertura, para baixar o estoque
+  inicial do servidor.
+
+COMO FUNCIONA SEM INTERNET
+- O programa guarda uma copia local do estoque no proprio computador.
+- Sem internet, voce continua vendendo e lancando entradas e saidas.
+- As operacoes feitas offline ficam salvas em fila e sao enviadas
+  automaticamente ao servidor quando a internet voltar.
+- A barra do programa avisa quando esta no modo offline.
+
+Onde ficam os dados: os produtos, vendas e pagamentos oficiais ficam no
+servidor central (banco SQL Server remoto). A copia local e um espelho
+apenas para continuar trabalhando quando a rede cair.
+
+SUPORTE
+- Se o estoque aparecer vazio, abra o programa com internet e aguarde
+  alguns segundos ate o primeiro carregamento.
