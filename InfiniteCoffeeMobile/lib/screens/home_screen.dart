@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../repositories/inventory_repository.dart';
+import '../utils/product_search.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.repository});
@@ -47,12 +48,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _reload([String search = '']) {
+  void _reload([String? search]) {
     setState(() {
-      _search = search;
-      _stock = widget.repository.load(search: search);
+      if (search != null) _search = search;
+      _stock = widget.repository.load();
     });
   }
+
+  void _setSearch(String search) => setState(() => _search = search);
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final data =
             snapshot.data ??
             const InventorySnapshot(products: [], isOffline: true);
+        final matchingProducts = filterProducts(data.products, _search);
         return _selectedIndex == 0
             ? _Dashboard(
                 products: data.products,
@@ -75,18 +79,19 @@ class _HomeScreenState extends State<HomeScreen> {
               )
             : _selectedIndex == 1
             ? _ProductsView(
-                products: data.products,
-                onSearch: _reload,
+                products: matchingProducts,
+                search: _search,
+                onSearch: _setSearch,
                 onEdit: _showProductDialog,
                 onDelete: _deleteProduct,
               )
             : _selectedIndex == 2
             ? _StockView(
-                products: data.products,
+                products: matchingProducts,
                 offline: data.isOffline,
                 errorMessage: data.errorMessage,
                 search: _search,
-                onSearch: _reload,
+                onSearch: _setSearch,
                 onExit: _registerExit,
                 onEntry: _registerEntry,
                 onCreateProduct: _showProductDialog,
@@ -96,9 +101,9 @@ class _HomeScreenState extends State<HomeScreen> {
               )
             : _selectedIndex == 3
             ? _SaleView(
-                products: data.products,
+                products: matchingProducts,
                 search: _search,
-                onSearch: _reload,
+                onSearch: _setSearch,
                 cart: _cart.values.toList(),
                 onAdd: _addToCart,
                 onRemove: _removeFromCart,
@@ -194,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _runSync(String successMessage) async {
-    setState(() => _stock = widget.repository.syncNow(search: _search));
+    setState(() => _stock = widget.repository.syncNow());
     final result = await _stock;
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -674,11 +679,13 @@ class _Dashboard extends StatelessWidget {
 class _ProductsView extends StatelessWidget {
   const _ProductsView({
     required this.products,
+    required this.search,
     required this.onSearch,
     required this.onEdit,
     required this.onDelete,
   });
   final List<Product> products;
+  final String search;
   final ValueChanged<String> onSearch;
   final ValueChanged<Product> onEdit;
   final ValueChanged<Product> onDelete;
@@ -687,6 +694,7 @@ class _ProductsView extends StatelessWidget {
   Widget build(BuildContext context) => _ProductList(
     title: 'Produtos',
     products: products,
+    search: search,
     onSearch: onSearch,
     onEdit: onEdit,
     onDelete: onDelete,
@@ -785,7 +793,7 @@ class _StockView extends StatelessWidget {
   }
 }
 
-class _ProductList extends StatelessWidget {
+class _ProductList extends StatefulWidget {
   const _ProductList({
     required this.title,
     required this.products,
@@ -808,33 +816,67 @@ class _ProductList extends StatelessWidget {
   final ValueChanged<Product>? onDelete;
 
   @override
+  State<_ProductList> createState() => _ProductListState();
+}
+
+class _ProductListState extends State<_ProductList> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.search);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProductList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_searchController.text != widget.search) {
+      _searchController.value = TextEditingValue(
+        text: widget.search,
+        selection: TextSelection.collapsed(offset: widget.search.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: TextField(
-            onChanged: onSearch,
+            controller: _searchController,
+            onChanged: widget.onSearch,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Pesquisar nome ou código de barras',
-              suffixIcon: search.isEmpty
+              suffixIcon: widget.search.isEmpty
                   ? null
                   : IconButton(
-                      onPressed: () => onSearch(''),
+                      onPressed: () {
+                        _searchController.clear();
+                        widget.onSearch('');
+                      },
                       icon: const Icon(Icons.clear),
                     ),
             ),
           ),
         ),
         Expanded(
-          child: products.isEmpty
+          child: widget.products.isEmpty
               ? const Center(child: Text('Nenhum produto encontrado.'))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: products.length,
+                  itemCount: widget.products.length,
                   itemBuilder: (context, index) {
-                    final product = products[index];
+                    final product = widget.products[index];
                     final low = product.quantity <= 5;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -848,11 +890,11 @@ class _ProductList extends StatelessWidget {
                           '${product.type} • ${product.barcode ?? 'Sem código'}',
                         ),
                         trailing:
-                            onExit == null &&
-                                onEntry == null &&
-                                onAdd == null &&
-                                onEdit == null &&
-                                onDelete == null
+                            widget.onExit == null &&
+                                widget.onEntry == null &&
+                                widget.onAdd == null &&
+                                widget.onEdit == null &&
+                                widget.onDelete == null
                             ? Text('${product.quantity} un.')
                             : Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -864,42 +906,43 @@ class _ProductList extends StatelessWidget {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  if (onEntry != null)
+                                  if (widget.onEntry != null)
                                     IconButton(
                                       tooltip: 'Registrar entrada',
-                                      onPressed: () => onEntry!(product),
+                                      onPressed: () => widget.onEntry!(product),
                                       icon: const Icon(
                                         Icons.add_circle_outline,
                                       ),
                                     ),
-                                  if (onExit != null)
+                                  if (widget.onExit != null)
                                     IconButton(
                                       tooltip: 'Registrar saída',
                                       onPressed: product.quantity == 0
                                           ? null
-                                          : () => onExit!(product),
+                                          : () => widget.onExit!(product),
                                       icon: const Icon(
                                         Icons.remove_circle_outline,
                                       ),
                                     ),
-                                  if (onAdd != null)
+                                  if (widget.onAdd != null)
                                     IconButton(
                                       tooltip: 'Adicionar à venda',
                                       onPressed: product.quantity == 0
                                           ? null
-                                          : () => onAdd!(product),
+                                          : () => widget.onAdd!(product),
                                       icon: const Icon(Icons.add_shopping_cart),
                                     ),
-                                  if (onEdit != null)
+                                  if (widget.onEdit != null)
                                     IconButton(
                                       tooltip: 'Editar produto',
-                                      onPressed: () => onEdit!(product),
+                                      onPressed: () => widget.onEdit!(product),
                                       icon: const Icon(Icons.edit_outlined),
                                     ),
-                                  if (onDelete != null)
+                                  if (widget.onDelete != null)
                                     IconButton(
                                       tooltip: 'Excluir produto',
-                                      onPressed: () => onDelete!(product),
+                                      onPressed: () =>
+                                          widget.onDelete!(product),
                                       icon: const Icon(Icons.delete_outline),
                                     ),
                                 ],
