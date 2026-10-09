@@ -9,7 +9,7 @@
         @foreach (var m in (List<Dictionary<string, object>>)ViewBag.Mesas)
         {
             var status = m["status_mesa"].ToString();
-            var disponivel = status == "Disponível";
+            var disponivel = status == "Disponível" || status == "Disponivel";
             <tr>
                 <td>Mesa @m["numero"]</td>
                 <td>@m["capacidade"] pessoas</td>
