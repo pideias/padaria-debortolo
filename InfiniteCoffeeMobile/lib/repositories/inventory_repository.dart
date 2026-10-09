@@ -13,44 +13,35 @@ class InventoryRepository {
   static const _pendingKey = 'pending_stock_exits';
   final InventoryApi _api;
 
-  Future<InventorySnapshot> load({String search = ''}) async {
+  Future<InventorySnapshot> load() async {
     try {
-      final products = await _api.getStock(search: search);
+      // Keep the full catalog cached; the UI filters it locally as the user types.
+      final products = await _api.getStock();
       await _saveProducts(products);
       unawaited(_syncPending().catchError((_) {}));
       return InventorySnapshot(products: products, isOffline: false);
     } catch (error) {
       final products = await _readProducts();
-      final term = search.trim().toLowerCase();
-      final filtered = term.isEmpty
-          ? products
-          : products
-                .where(
-                  (product) =>
-                      product.name.toLowerCase().contains(term) ||
-                      (product.barcode ?? '').contains(term),
-                )
-                .toList();
       final message = switch (error) {
         ApiException(:final message) => message,
         TimeoutException() => 'O servidor demorou para responder. Tente novamente em alguns segundos.',
         _ => 'Nao foi possivel conectar a API. Verifique a rede e se o servidor esta ligado.',
       };
       return InventorySnapshot(
-        products: filtered,
+        products: products,
         isOffline: true,
         errorMessage: message,
       );
     }
   }
 
-  Future<InventorySnapshot> syncNow({String search = ''}) async {
+  Future<InventorySnapshot> syncNow() async {
     try {
       await _syncPending();
     } catch (_) {
       // The queue remains persisted and will be retried on the next refresh.
     }
-    return load(search: search);
+    return load();
   }
 
   Future<List<Map<String, dynamic>>> getSalesHistory() =>
