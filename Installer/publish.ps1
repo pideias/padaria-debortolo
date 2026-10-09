@@ -37,6 +37,7 @@ if (-not $SkipFlutter) {
 
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PadariaDebortolo.cmd') -Destination $serverOutput -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PadariaDesktop.cmd') -Destination $artifacts -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PadariaDesktop.ps1') -Destination $artifacts -Force
 
 if (-not $SkipInstaller) {
     $isccCandidates = @(

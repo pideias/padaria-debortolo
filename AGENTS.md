@@ -41,10 +41,13 @@ Estas regras valem para todo trabalho neste repositorio.
 
 ## Git e publicacao
 
-- O remoto oficial e `https://github.com/pideias/pideias-infinittecoffee.git`.
-- Todo commit e push de desenvolvimento deste projeto deve ser feito na branch `CdmEdu`.
-- A `master` recebe mudancas somente por merge aprovado da `CdmEdu`.
-- Antes de qualquer commit ou push de desenvolvimento, confirme que a branch atual e `CdmEdu`.
+- O remoto oficial e `https://github.com/pideias/padaria-debortolo.git`.
+- Todo commit e push de desenvolvimento deste projeto deve ser feito exclusivamente na branch `kaio`.
+- Antes de qualquer commit ou push, confirme que a branch atual e `kaio`; nunca publique diretamente na `master`.
+- Antes de qualquer commit ou push, atualize as referencias remotas e confira a `master` para verificar se a branch esta sincronizada e se existem mudancas que precisam ser integradas:
+  `git fetch origin master` e `git log --oneline --decorate -5 origin/master`.
+- Se a `master` estiver mais avancada ou houver divergencia, pare e informe antes de fazer commit ou push.
+- A `master` recebe mudancas somente por merge aprovado da `kaio`.
 - Antes de commit, confira `git status`, `git diff` e o resultado do build.
 - Nao use `git reset --hard`, `git checkout --` ou force push para apagar trabalho existente.
 - Use mensagens de commit curtas e descreva uma mudanca coesa.
@@ -54,6 +57,9 @@ Estas regras valem para todo trabalho neste repositorio.
 - O aplicativo mobile deve ser desenvolvido em Flutter usando Dart.
 - O projeto Flutter fica em `InfiniteCoffeeMobile` e deve permanecer separado do MVC.
 - O backend continua em ASP.NET Core .NET 10.
+- A API do ambiente demonstrativo deve permanecer pública (`PADARIA_PUBLIC_API=true`):
+  APK, desktop e web não exigem `X-Api-Key` nem tokens embutidos no aplicativo. Credenciais
+  do Google Drive e demais segredos devem permanecer exclusivamente no backend.
 - O SQL Server permanece como fonte oficial dos dados.
 - Operacoes offline devem ser persistidas localmente e sincronizadas depois.
 - Nunca confirme uma venda sem revalidar o estoque no backend.
@@ -76,6 +82,8 @@ Estas regras valem para todo trabalho neste repositorio.
 - Rede: app Windows usa `http://localhost:5049`; app mobile na mesma LAN usa o IP da maquina
   (ex.: `http://192.168.x.x:5049`). O CORS em `Program.cs` deve liberar essa origem.
 - SQL Server continua sendo a fonte da verdade; Hive no app e um espelho offline.
+- O banco remoto de producao/demonstracao pode ser hospedado em uma VM x86 da Oracle Cloud;
+  use `OracleCloud/README.md` e nunca coloque senha na connection string versionada.
 
 ## Preservacao de historico
 

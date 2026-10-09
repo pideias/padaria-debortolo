@@ -11,6 +11,9 @@ public sealed class RelatoriosApiController : ControllerBase
     [HttpGet("vendas")]
     public IActionResult Vendas() => Ok(Banco.ResumoVendas());
 
+    [HttpGet("vendas/historico")]
+    public IActionResult HistoricoVendas([FromQuery] int limite = 200) => Ok(Banco.HistoricoVendas(limite));
+
     /// <summary>Retorna os produtos e alertas do estoque atual.</summary>
     [HttpGet("estoque")]
     public IActionResult Estoque() => Ok(new { produtos = Banco.ListarEstoque(), alertas = Banco.ListarEstoqueBaixo() });

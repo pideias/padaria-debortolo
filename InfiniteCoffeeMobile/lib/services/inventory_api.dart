@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
@@ -10,11 +9,15 @@ class InventoryApi {
   InventoryApi({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const _configuredBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://padaria-debortolo-api-8w5w.onrender.com',
+  );
+  static const _configuredWriteBaseUrl = String.fromEnvironment(
+    'API_WRITE_BASE_URL',
+  );
   static const _apiToken = String.fromEnvironment('API_ACCESS_TOKEN');
   static const _writeToken = String.fromEnvironment('API_WRITE_TOKEN');
-  static const _localNetworkBaseUrl = 'http://192.168.1.101:5049';
-
   Map<String, String> _headers([
     Map<String, String>? extra,
     bool write = false,
@@ -25,15 +28,17 @@ class InventoryApi {
     return {if (token.trim().isNotEmpty) 'X-Api-Key': token, ...?extra};
   }
 
-  // API_BASE_URL permite apontar para o backend local durante o desenvolvimento.
+  // API_BASE_URL pode apontar para um backend local somente em desenvolvimento.
   String get baseUrl {
-    if (_configuredBaseUrl.trim().isNotEmpty) {
-      return _configuredBaseUrl.replaceFirst(RegExp(r'/$'), '');
+    return _configuredBaseUrl.replaceFirst(RegExp(r'/$'), '');
+  }
+
+  // Escritas precisam chegar ao servidor que acessa o SQL Server.
+  String get writeBaseUrl {
+    if (_configuredWriteBaseUrl.trim().isNotEmpty) {
+      return _configuredWriteBaseUrl.replaceFirst(RegExp(r'/$'), '');
     }
-    if (kIsWeb) return 'http://localhost:5049';
-    return defaultTargetPlatform == TargetPlatform.android
-        ? _localNetworkBaseUrl
-        : 'http://localhost:5049';
+    return baseUrl;
   }
 
   Future<List<Product>> getStock({String search = ''}) async {
@@ -68,7 +73,7 @@ class InventoryApi {
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$baseUrl/api/estoque/saida'),
+          Uri.parse('$writeBaseUrl/api/estoque/saida'),
           headers: _headers({'Content-Type': 'application/json'}, true),
           body: jsonEncode({
             'produtoId': productId,
@@ -93,7 +98,7 @@ class InventoryApi {
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$baseUrl/api/estoque/entrada'),
+          Uri.parse('$writeBaseUrl/api/estoque/entrada'),
           headers: _headers({'Content-Type': 'application/json'}, true),
           body: jsonEncode({
             'produtoId': productId,
@@ -110,6 +115,128 @@ class InventoryApi {
     }
   }
 
+  Future<Set<String>> pushSync(List<Map<String, dynamic>> operations) async {
+    final response = await _client
+        .post(
+          Uri.parse('$writeBaseUrl/api/sync/push'),
+          headers: _headers({'Content-Type': 'application/json'}, true),
+          body: jsonEncode({'operacoes': operations}),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Nao foi possivel sincronizar as operacoes.',
+        response.statusCode,
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['aceitos'] as List<dynamic>? ?? const [])
+        .cast<String>()
+        .toSet();
+  }
+
+  Future<void> createSale({
+    required String customer,
+    required String payment,
+    required List<Map<String, int>> items,
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$writeBaseUrl/api/vendas'),
+          headers: _headers({'Content-Type': 'application/json'}, true),
+          body: jsonEncode({
+            'clienteNome': customer,
+            'formaPagamento': payment,
+            'itens': items,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      throw ApiException(
+        '${body['mensagem'] ?? 'Nao foi possivel finalizar a venda.'}',
+        response.statusCode,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesHistory() async {
+    final response = await _client
+        .get(
+          Uri.parse('$baseUrl/api/relatorios/vendas/historico'),
+          headers: _headers(),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Nao foi possivel carregar o historico de vendas.',
+        response.statusCode,
+      );
+    }
+    return (jsonDecode(response.body) as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<void> updateProduct({
+    required int productId,
+    required String name,
+    required String description,
+    required String barcode,
+    required String type,
+    required double price,
+  }) async {
+    final response = await _client
+        .put(
+          Uri.parse('$writeBaseUrl/api/produtos/$productId'),
+          headers: _headers({'Content-Type': 'application/json'}, true),
+          body: jsonEncode({
+            'nome': name,
+            'descricao': description,
+            'codigoBarras': barcode,
+            'tipo': type,
+            'preco': price,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw ApiException(
+          '${body['mensagem'] ?? 'Nao foi possivel atualizar o produto.'}',
+          response.statusCode,
+        );
+      } on FormatException {
+        throw ApiException(
+          'A API retornou o erro ${response.statusCode}.',
+          response.statusCode,
+        );
+      }
+    }
+  }
+
+  Future<void> deleteProduct(int productId) async {
+    final response = await _client
+        .delete(
+          Uri.parse('$writeBaseUrl/api/produtos/$productId'),
+          headers: _headers(null, true),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw ApiException(
+          '${body['mensagem'] ?? 'Nao foi possivel excluir o produto.'}',
+          response.statusCode,
+        );
+      } on FormatException {
+        throw ApiException(
+          'A API retornou o erro ${response.statusCode}.',
+          response.statusCode,
+        );
+      }
+    }
+  }
+
   Future<void> createProduct({
     required String name,
     required String description,
@@ -120,7 +247,7 @@ class InventoryApi {
   }) async {
     final response = await _client
         .post(
-          Uri.parse('$baseUrl/api/produtos'),
+          Uri.parse('$writeBaseUrl/api/produtos'),
           headers: _headers({'Content-Type': 'application/json'}, true),
           body: jsonEncode({
             'nome': name,
@@ -133,20 +260,18 @@ class InventoryApi {
         )
         .timeout(const Duration(seconds: 60));
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw const ApiException('Nao foi possivel cadastrar o produto.');
-    }
-  }
-
-  Future<void> backup() async {
-    final response = await _client
-        .post(Uri.parse('$baseUrl/api/estoque/backup'))
-        .timeout(const Duration(seconds: 60));
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        '${body['mensagem'] ?? 'Nao foi possivel enviar o backup.'}',
-        response.statusCode,
-      );
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw ApiException(
+          '${body['mensagem'] ?? 'Nao foi possivel cadastrar o produto.'}',
+          response.statusCode,
+        );
+      } on FormatException {
+        throw ApiException(
+          'A API retornou o erro ${response.statusCode}.',
+          response.statusCode,
+        );
+      }
     }
   }
 }

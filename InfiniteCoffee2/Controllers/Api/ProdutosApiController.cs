@@ -34,6 +34,21 @@ public sealed class ProdutosApiController : ControllerBase
         Banco.CadastrarProduto(request.Nome.Trim(), request.Preco, request.Tipo.Trim(), request.Quantidade, request.CodigoBarras ?? string.Empty, request.Descricao ?? string.Empty);
         return StatusCode(StatusCodes.Status201Created, new { mensagem = "Produto cadastrado com sucesso." });
     }
+
+    [HttpPut("{id:int}")]
+    public IActionResult Editar(int id, [FromBody] EditarProdutoRequest request)
+    {
+        if (id <= 0 || string.IsNullOrWhiteSpace(request.Nome) || request.Nome.Length > 100 ||
+            request.Preco <= 0 || string.IsNullOrWhiteSpace(request.Tipo) || request.Tipo.Length > 50 ||
+            request.Descricao?.Length > 500 || request.CodigoBarras?.Length > 50)
+            return BadRequest(new { mensagem = "Informe dados válidos para o produto." });
+
+        if (!Banco.AtualizarDadosProduto(id, request.Nome, request.Preco, request.Tipo,
+                request.CodigoBarras ?? string.Empty, request.Descricao ?? string.Empty))
+            return NotFound(new { mensagem = "Produto não encontrado ou inativo." });
+
+        return Ok(new { mensagem = "Produto atualizado com sucesso." });
+    }
 }
 
 public sealed class CriarProdutoRequest
@@ -44,4 +59,13 @@ public sealed class CriarProdutoRequest
     public string Tipo { get; set; } = "Produto";
     public decimal Preco { get; set; }
     public int Quantidade { get; set; }
+}
+
+public sealed class EditarProdutoRequest
+{
+    public string Nome { get; set; } = string.Empty;
+    public string? Descricao { get; set; }
+    public string? CodigoBarras { get; set; }
+    public string Tipo { get; set; } = "Produto";
+    public decimal Preco { get; set; }
 }

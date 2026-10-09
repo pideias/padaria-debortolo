@@ -1,5 +1,5 @@
 using InfiniteCoffee2.Data;
-using InfiniteCoffee2.Services;
+using InfiniteCoffee2.Middleware;
 
 namespace InfiniteCoffee2
 {
@@ -9,19 +9,11 @@ namespace InfiniteCoffee2
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            var snapshotOnly = string.Equals(
-                Environment.GetEnvironmentVariable("PADARIA_SNAPSHOT_ONLY"), "true", StringComparison.OrdinalIgnoreCase);
-            if (!snapshotOnly)
-            {
-                Banco.Configurar(
-                    Environment.GetEnvironmentVariable("PADARIA_CONNECTION_STRING") ??
-                    builder.Configuration.GetConnectionString("DefaultConnection"));
-            }
+            Banco.Configurar(
+                Environment.GetEnvironmentVariable("PADARIA_CONNECTION_STRING") ??
+                builder.Configuration.GetConnectionString("DefaultConnection"));
 
             builder.Services.AddControllersWithViews();
-            builder.Services.AddSingleton<GoogleDriveSnapshotHostedService>();
-            builder.Services.AddHostedService(provider => provider.GetRequiredService<GoogleDriveSnapshotHostedService>());
-            builder.Services.AddHttpClient<GoogleDriveSnapshotStore>();
             builder.Services.AddCors(options =>
             {
                 // O trabalho demonstrativo usa a API a partir do web, desktop e mobile.
@@ -61,9 +53,13 @@ namespace InfiniteCoffee2
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
+            // O Render termina o HTTPS no proxy e encaminha HTTP para o container.
+            // Redirecionar novamente dentro do container gera aviso e nao e necessario.
+            if (app.Environment.IsDevelopment())
+                app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseMiddleware<ApiKeyMiddleware>();
             app.UseCors("FlutterDevelopment");
 
             // Swagger fica disponível para o grupo testar as APIs durante o desenvolvimento.
@@ -82,6 +78,7 @@ namespace InfiniteCoffee2
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+            app.MapControllers();
 
             app.Run();
 

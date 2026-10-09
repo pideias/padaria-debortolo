@@ -24,6 +24,7 @@ Source: "..\artifacts\desktop\*"; DestDir: "{app}\desktop"; Flags: ignoreversion
 Source: "..\DatabaseScripts\*"; DestDir: "{app}\database"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "Setup-Database.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Start-PadariaDesktop.cmd"; DestDir: "{app}"; Flags: ignoreversion
+Source: "Start-PadariaDesktop.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\Start-PadariaDesktop.cmd"; WorkingDir: "{app}"

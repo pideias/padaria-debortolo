@@ -26,6 +26,10 @@ public sealed class ApiKeyMiddleware
         var configuredToken = Environment.GetEnvironmentVariable("PADARIA_API_TOKEN");
         var readOnlyToken = Environment.GetEnvironmentVariable("PADARIA_READONLY_TOKEN");
         var mobileWriteToken = Environment.GetEnvironmentVariable("PADARIA_MOBILE_WRITE_TOKEN");
+        var publicApi = string.Equals(
+            Environment.GetEnvironmentVariable("PADARIA_PUBLIC_API"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
         var suppliedToken = context.Request.Headers["X-Api-Key"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(suppliedToken))
             suppliedToken = context.Request.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
@@ -37,8 +41,13 @@ public sealed class ApiKeyMiddleware
         var writeRequest = !HttpMethods.IsGet(context.Request.Method) &&
                            !HttpMethods.IsHead(context.Request.Method) &&
                            !HttpMethods.IsOptions(context.Request.Method);
-        var authorized = string.IsNullOrWhiteSpace(configuredToken)
-            ? string.IsNullOrWhiteSpace(readOnlyToken) && loopback
+        var noTokensConfigured = string.IsNullOrWhiteSpace(configuredToken) &&
+                                 string.IsNullOrWhiteSpace(readOnlyToken) &&
+                                 string.IsNullOrWhiteSpace(mobileWriteToken);
+        var authorized = publicApi || noTokensConfigured
+            ? true
+            : string.IsNullOrWhiteSpace(configuredToken)
+              ? string.IsNullOrWhiteSpace(readOnlyToken) && loopback
             : Matches(suppliedToken, configuredToken) ||
               (!writeRequest && Matches(suppliedToken, readOnlyToken)) ||
               Matches(suppliedToken, mobileWriteToken);
