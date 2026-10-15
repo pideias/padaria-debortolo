@@ -1,16 +1,16 @@
-# Documentacao para IAs e Desenvolvedores
+# Documentação para IAs e Desenvolvedores
 
-Este arquivo e a fonte de contexto rapido do Infinite Coffee. Antes de alterar o projeto,
-leia este arquivo, `AGENTS.md`, `README.md` e a skill relacionada ao fluxo.
+Este arquivo resume o estado implementado do demonstrativo Padaria Debortolo. Infinite Coffee
+foi o nome anterior do projeto. Antes de alterar o código, leia este arquivo, `AGENTS.md`,
+`README.md` e a skill relacionada ao fluxo.
 
 ## Identidade do projeto
 
-- Nome: Infinite Coffee.
+- Aplicativo demonstrativo: Padaria Debortolo. Nome anterior do projeto: Infinite Coffee.
 - Backend: ASP.NET Core MVC em .NET 10.
-- Banco oficial: SQL Server `localhost\KAIO`, database `infiniteCoffee`.
+- Banco oficial: SQL Server; o identificador do banco no script é `infiniteCoffee`.
 - Acesso ao banco: `InfiniteCoffee2/Data/Banco.cs`.
 - API REST e Swagger: `InfiniteCoffee2/Controllers/Api`.
-- App Flutter atual: `C:\Users\kaiof\Desktop\infinite_coffee_app`.
 - Pasta Flutter versionada no repositorio: `InfiniteCoffeeMobile`.
 - Branch oficial para publicacao: `kaio`.
 
@@ -22,49 +22,35 @@ leia este arquivo, `AGENTS.md`, `README.md` e a skill relacionada ao fluxo.
 4. Skill especifica em `.opencode/skills/`.
 5. Testes e README antes de editar.
 
-## Arquitetura atual
+## Arquitetura implementada
 
 ```text
-Windows .exe / Android .apk / Flutter Web
-             |
-             | HTTP REST
-             v
-ASP.NET Core publicado no Render
-             |
-             v
-SQL Server infiniteCoffee (fonte da verdade)
+Flutter (Android / Windows / Web)
+        | HTTP REST + JSON
+        v
+ASP.NET Core .NET 10 (MVC + API)
+        | Banco.cs / SQL
+        v
+SQL Server (fonte oficial)
+
+Cliente: shared_preferences (cache do catálogo e fila pendente)
 ```
 
-- Windows e Android usam o mesmo codigo Flutter.
-- No app, o Hive e o espelho offline local; ele nao substitui o SQL Server.
-- O app nao conversa diretamente com outro dispositivo. Windows e celular conversam
-  entre si por meio da API e do SQL Server.
-- Windows e Android usam `https://padaria-debortolo-api-8w5w.onrender.com` por padrao.
-- Para desenvolvimento local, compile informando `API_BASE_URL` com a URL local desejada.
+- O cliente não acessa o SQL Server diretamente. Os dispositivos comunicam-se com o servidor pela API REST.
+- O cliente usa `shared_preferences`; não há Hive ou SQLite implementado no código Flutter atual.
+- `API_BASE_URL` configura consultas e `API_WRITE_BASE_URL` pode separar a URL de escrita.
+- `InventoryRepository.load()` consulta `GET /api/estoque`, atualiza `cached_products` e tenta reenviar pendências.
+- Sem resposta da API, a tela usa o catálogo salvo localmente. Entrada, saída e venda podem ficar em `pending_stock_exits`.
+- A fila é enviada por `POST /api/sync/push`. O cliente atual não executa o pull incremental, embora exista endpoint de pull no backend.
+- Ao recuperar conectividade e durante a atualização periódica da tela, o app tenta carregar o estoque e sincronizar a fila.
 
-## Fluxo de inicializacao do Flutter
+Arquivos Flutter principais:
 
-1. `main.dart` cria `InventoryApi`, `LocalDatabase`, `SyncService` e `InventoryRepository`.
-2. `InventoryRepository.init()` abre as boxes Hive.
-3. Se nao houver produtos locais, executa o seed por `GET /api/sync/pull`.
-4. O `SyncService` agenda sincronizacao a cada 30 segundos e ao recuperar conectividade.
-5. `HomeScreen` mostra o Hive imediatamente e atualiza em segundo plano, sem trocar a tela
-   por spinner durante cada consulta.
-
-## Boxes Hive
-
-- `produtos`: catalogo local, chave `id_produto`.
-- `movimentacoes`: historico recebido do servidor, chave `id_movimentacao`.
-- `sync_queue`: operacoes offline com `tipo`, `clientUuid`, `payload`, `created_at`.
-- `sync_state`: token `last_pull` usado no proximo pull.
-
-Arquivos principais:
-
-- `lib/database/local_database.dart`: persistencia Hive e fila local.
-- `lib/services/sync_service.dart`: push/pull e agenda.
-- `lib/services/inventory_api.dart`: chamadas HTTP.
-- `lib/repositories/inventory_repository.dart`: regras de negocio offline-first.
-- `lib/screens/home_screen.dart`: dashboard, produtos, estoque e PDV.
+- `lib/services/inventory_api.dart`: requisições HTTP para a API.
+- `lib/repositories/inventory_repository.dart`: cache, fila offline e regras do cliente.
+- `lib/models/product.dart` e `lib/models/sales_by_product.dart`: modelos de resposta.
+- `lib/screens/home_screen.dart`: navegação, estoque, produtos, PDV e histórico.
+- `lib/screens/sales_report_screen.dart`: gráfico de vendas agregadas por produto.
 
 ## Contratos REST
 
@@ -87,6 +73,7 @@ Arquivos principais:
 
 - `POST /api/vendas`: cria pedido, itens, pagamento e baixa estoque em uma transacao.
 - `GET /api/relatorios/vendas`: resumo de vendas do dia.
+- `GET /api/relatorios/vendas/produtos`: quantidade e faturamento por produto em pedidos finalizados e pagos.
 - `GET /api/relatorios/estoque`: estoque e alertas.
 
 ### Sincronizacao
@@ -103,23 +90,26 @@ Arquivos principais:
   `Produtos`, alem dos triggers de auditoria.
 - `modified_at` usa UTC (`GETUTCDATE()`).
 - Entradas, saidas e vendas usam transacoes quando alteram estoque.
+- No atendimento MVC, adicionar item compara a quantidade solicitada com o saldo menos as quantidades já incluídas no pedido aberto; a inclusão não reserva nem baixa o estoque.
+- Ao finalizar o atendimento, `Banco.FinalizarAtendimento` revalida todos os itens e grava baixa, movimentações, pagamento, status do pedido e liberação da mesa na mesma transação.
+- O fechamento legado de pedidos usa `Banco.FecharPedidoComBaixaEstoque` para validar e registrar as saídas.
+- O POST de cancelamento só remove pedidos abertos quando vem do formulário explícito; a requisição beacon de recarga/volta do navegador é ignorada.
 - Foreign keys relacionam pedidos, itens, pagamentos, produtos, clientes, funcionarios e mesas.
 - Produto com historico nao deve sofrer `DELETE` fisico. A exclusao da interface e inativacao:
   `ativo = 0` e `quantidade_estoque = 0`.
 - A limpeza completa executada no ambiente de testes removeu os registros, nao as tabelas.
   Nunca repetir limpeza em outro ambiente sem confirmacao explicita.
 
-## Fluxo offline
+## Fluxo offline implementado
 
-1. A tela le produtos do Hive.
-2. Entrada, saida e venda atualizam o saldo local de forma otimista.
-3. A operacao entra em `sync_queue`.
-4. Quando houver rede, o app envia a fila para `/api/sync/push`.
-5. O servidor valida estoque e grava dados oficiais.
-6. O app executa pull e substitui o saldo local pelo valor oficial.
+1. O app consulta `GET /api/estoque` e persiste o catálogo serializado em `cached_products`.
+2. Se a API falhar, apresenta o catálogo salvo e sinaliza a condição offline.
+3. Entradas, saídas e vendas que falham por erro temporário de rede são guardadas em `pending_stock_exits` com `clientUuid`.
+4. Ao voltar a conexão ou atualizar o estoque, o cliente envia a fila para `POST /api/sync/push`.
+5. O servidor revalida estoque, aplica a operação transacionalmente e retorna os identificadores aceitos.
+6. O cliente remove da fila somente as operações aceitas; o SQL Server continua sendo a fonte oficial.
 
-O servidor e quem decide conflitos de estoque. O total exibido no PDV e apenas previsao;
-o servidor valida o estoque e calcula o total final.
+Cadastro/edição de produto, histórico e relatório de vendas por produto requerem comunicação com a API. O total do PDV no cliente é estimado; o backend confirma preços, estoque e total antes de finalizar.
 
 ## Comandos de desenvolvimento
 
@@ -159,69 +149,32 @@ flutter run -d emulator-5554
 - Confirme que uma exclusao retira o produto das listas sem apagar historico de venda.
 - Nao coloque senha ou credencial em codigo, README, skill, log ou commit.
 
-## Publicacao e instalador Windows
+## Publicação da API e do aplicativo
 
-- O instalador completo e gerado por `Installer/publish.ps1`.
-- O pacote inclui o backend ASP.NET Core self-contained, o aplicativo Flutter Windows,
-  os scripts do banco e a rotina `Installer/Setup-Database.ps1`.
-- O banco e inicializado pelo script idempotente `DatabaseScripts/InstallDatabase.sql`.
-  Ele cria o banco `infiniteCoffee`, tabelas, procedures e dados iniciais sem apagar dados
-  existentes.
-- Durante a instalacao, o script procura SQL Server em `localhost\\KAIO`,
-  `localhost\\SQLEXPRESS`, `localhost` e `(localdb)\\MSSQLLocalDB`. Se encontrar uma
-  instancia, grava a conexao em `server/appsettings.Production.json`.
-- O SQL Server nao e distribuido no instalador. Em um PC virgem, ele deve ser instalado
-  previamente; se nao for encontrado, a instalacao informa o requisito com erro claro.
-- O Inno Setup 7 compila `artifacts/installer/PadariaDebortolo-Setup.exe`. O script de
-  publicacao detecta Inno Setup 7 ou 6 automaticamente.
-- Os icones do aplicativo sao gerados a partir de `InfiniteCoffeeMobile/assets/icon/app_icon.png`
-  para Android, Windows e Web usando `flutter_launcher_icons`.
-- O instalador nao contem tokens, senhas, credenciais OAuth ou strings de conexao com
-  credenciais.
-- As APIs estao publicas para o trabalho demonstrativo: nao exigem mais `X-Api-Key` no
-  mobile, desktop ou web. A credencial do Google Drive continua somente no servidor e nao
-  deve ser distribuida nos aplicativos.
-- O Render usa `PADARIA_PUBLIC_API=true` no ambiente demonstrativo para permitir que APK e
-  desktop de teste acessem a API sem embutir tokens. Em producao, desative essa variavel e
-  use tokens de leitura e escrita separados.
-- Os tokens continuam aceitos por compatibilidade, mas nao sao obrigatorios enquanto a API
-  demonstrativa estiver publica. APKs novos podem ser compilados sem `API_ACCESS_TOKEN` e
-  `API_WRITE_TOKEN`.
-- O cliente mobile e o desktop usam por padrao `https://padaria-debortolo-api-8w5w.onrender.com`
-  para leitura e escrita. Para desenvolvimento local, compile explicitamente com
-  `API_BASE_URL` e `API_WRITE_BASE_URL` apontando para a API local. O cliente aguarda ate 60
-  segundos para permitir o despertar da instancia gratuita.
-- No modo demonstrativo, o mobile mantém uma cópia local persistente dos produtos, atualiza
-  o saldo imediatamente após entrada/saída e mantém operações pendentes para sincronização
-  posterior pela API. O SQL Server é a fonte oficial.
-- O desktop e o APK usam por padrao a API central no Render. O backend local continua
-  disponivel somente para desenvolvimento, mediante `API_BASE_URL` explicito.
-- Para compilar APK e Windows automaticamente, use `Installer/Build-Apps.ps1`. O script lê
-  `PADARIA_READONLY_TOKEN` e `PADARIA_MOBILE_WRITE_TOKEN` do ambiente apenas quando elas
-  existirem e nunca salva esses valores no repositorio. Os dois aplicativos usam a URL do
-  Render por padrao.
+- `Installer/publish.ps1` gera o pacote Windows para instalação local.
+- A publicação automática para a VM Hostinger está descrita em `DEPLOY-HOSTINGER.md` e no job
+  `deploy-hostinger` de `.github/workflows/validate.yml`.
+- O deploy automático só roda após validação bem-sucedida de um `push` em `master` e quando a
+  variável `HOSTINGER_DEPLOY_ENABLED=true` e os secrets SSH estiverem configurados no GitHub.
+- A publicação cria backup no servidor, preserva `/opt/padaria-api/app.env`, reinicia `padaria-api`
+  e valida `/api/health`; em falha, restaura a versão anterior.
+- A API continua usando `PADARIA_CONNECTION_STRING` no backend. Segredos e arquivos `app.env` nunca
+  devem entrar no GitHub ou nos pacotes do APK/Windows.
+- O deploy da API não recompila nem distribui os clientes Flutter. Para que um APK/EXE use a VM,
+  configure `API_BASE_URL` e `API_WRITE_BASE_URL` no build. O valor padrão em `Build-Apps.ps1` ainda
+  pode apontar para outro ambiente.
+- O workflow não aplica alterações de schema. Mudanças em tabelas/procedures requerem script SQL
+  revisado, backup e aplicação controlada no banco da VM.
 
-## Limitacoes e proximos cuidados
+## Limites da implementação atual
 
-- O Hive e populado pelo primeiro sync; ainda nao existe um arquivo de banco prepopulado
-  dentro do APK.
-- A fila usa `clientUuid`, mas o servidor ainda precisa de uma tabela de idempotencia para
-  impedir duplicacao se a mesma operacao for reenviada apos uma falha de resposta.
-- A inativacao incremental precisa de tombstones para remover automaticamente o produto de
-  outros dispositivos que ja tenham o cache; atualmente o dispositivo que executa a exclusao
-  remove o item localmente.
-- O APK exige Android SDK, NDK e uma imagem de emulador instalados.
-
-## Integracao centralizada
-
-- `POST /api/sync/push` persiste cada `clientUuid` em `SyncOperations`; reenvios da mesma
-  operacao sao tratados como aceitos sem repetir a baixa ou a venda.
-- O pull inclui produtos inativados com `ativo = 0` como tombstones, permitindo que os
-  caches removam o item sem apagar o historico no SQL Server.
-- O PDV envia uma venda unica para `/api/vendas`, deixando o servidor calcular o total e
-  executar pedido, itens, pagamento e baixa na mesma transacao.
-- O Render deve executar a API central com a string de conexao por segredo
-  (`PADARIA_CONNECTION_STRING`). A API consulta e altera diretamente o SQL Server.
-- Para hospedar o SQL Server fora do PC local, use uma VM x86/AMD da Oracle Cloud conforme
-  `OracleCloud/README.md`. O Render recebe o IP publico e a senha apenas em
-  `PADARIA_CONNECTION_STRING`; nenhuma credencial deve entrar no repositorio.
+- O armazenamento local mobile usa `shared_preferences`, não Hive nem SQLite.
+- O cliente mantém cache de produtos e fila de entradas, saídas e vendas. Cadastro/edição de produtos
+  e histórico de vendas dependem da API.
+- O backend implementa `GET /api/sync/pull`, mas o cliente atual consulta o estoque por
+  `GET /api/estoque` e envia pendências por `POST /api/sync/push`; não descreva o cliente como pull
+  incremental/bidirecional.
+- `GET /api/relatorios/vendas/produtos` agrega quantidade e faturamento de pedidos finalizados com pagamento para
+  o gráfico de vendas por produto. O endpoint considera todo o histórico e ainda não recebe filtro
+  de período.
+- O APK requer Android SDK para ser recompilado; Windows e Android usam a mesma base Flutter.

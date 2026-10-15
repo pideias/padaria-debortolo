@@ -54,6 +54,11 @@ namespace InfiniteCoffee2.Controllers
         // ── ETAPA 2: Escolher mesa ──────────────────────────────────────────
         public IActionResult EscolherMesa()
         {
+            if ((HttpContext.Session.GetInt32("pedidoId") ?? 0) > 0)
+                return RedirectToAction(nameof(AdicionarItens));
+            if ((HttpContext.Session.GetInt32("clienteId") ?? 0) <= 0)
+                return RedirectToAction(nameof(Index));
+
             ViewBag.Mesas = Banco.ListarMesas();
             return View();
         }
@@ -61,10 +66,27 @@ namespace InfiniteCoffee2.Controllers
         [HttpPost]
         public IActionResult SelecionarMesa(int mesaId)
         {
+            if ((HttpContext.Session.GetInt32("pedidoId") ?? 0) > 0)
+                return RedirectToAction(nameof(AdicionarItens));
+
+            var clienteId    = HttpContext.Session.GetInt32("clienteId") ?? 0;
+            if (clienteId <= 0 || mesaId <= 0)
+            {
+                TempData["Mensagem"] = "Selecione um cliente e uma mesa válidos para continuar.";
+                return RedirectToAction(nameof(Index));
+            }
+
             HttpContext.Session.SetInt32("mesaId", mesaId);
             Banco.AtualizarStatusMesa(mesaId, "Ocupada");
-            var clienteId    = HttpContext.Session.GetInt32("clienteId") ?? 0;
             var pedidoId     = Banco.CriarPedido(mesaId, null, clienteId);
+            if (pedidoId <= 0)
+            {
+                Banco.AtualizarStatusMesa(mesaId, "Disponível");
+                HttpContext.Session.Remove("mesaId");
+                TempData["Mensagem"] = "Não foi possível iniciar o pedido. Tente novamente.";
+                return RedirectToAction(nameof(EscolherMesa));
+            }
+
             HttpContext.Session.SetInt32("pedidoId", pedidoId);
             return RedirectToAction("AdicionarItens");
         }
@@ -72,8 +94,14 @@ namespace InfiniteCoffee2.Controllers
         // ── ETAPA 4: Adicionar itens ────────────────────────────────────────
         public IActionResult AdicionarItens()
         {
-            ViewBag.Produtos = Banco.ListarProdutos();
             var pedidoId = HttpContext.Session.GetInt32("pedidoId") ?? 0;
+            if (pedidoId <= 0)
+            {
+                TempData["Mensagem"] = "Nenhum atendimento ativo. Inicie um novo pedido.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            ViewBag.Produtos = Banco.ListarProdutos();
             ViewBag.PedidoId = pedidoId;
             ViewBag.ItensPedido = Banco.ListarItensPedido(pedidoId);
             ViewBag.Total = Banco.CalcularTotalPedido(pedidoId);
@@ -84,15 +112,28 @@ namespace InfiniteCoffee2.Controllers
         public IActionResult AdicionarItem(int produtoId, int quantidade)
         {
             var pedidoId = HttpContext.Session.GetInt32("pedidoId") ?? 0;
-            if (pedidoId == 0 || produtoId == 0 || quantidade < 1)
+            if (pedidoId <= 0)
             {
-                TempData["Mensagem"] = "Informe um produto e uma quantidade válida.";
-                return RedirectToAction("AdicionarItens");
+                TempData["Mensagem"] = "Nenhum atendimento ativo. Inicie um novo pedido.";
+                return RedirectToAction(nameof(Index));
             }
 
-            Banco.AdicionarItemPedido(pedidoId, produtoId, quantidade);
+            if (produtoId <= 0 || quantidade < 1)
+            {
+                TempData["Mensagem"] = "Informe um produto e uma quantidade válida.";
+                return RedirectToAction(nameof(AdicionarItens));
+            }
+
+            if (!Banco.AdicionarItemPedido(pedidoId, produtoId, quantidade, out var disponivel))
+            {
+                TempData["Mensagem"] = disponivel >= 0
+                    ? $"Quantidade acima do estoque disponível para este pedido. Disponível: {disponivel} unidade(s)."
+                    : "O pedido não está aberto ou o produto não está disponível.";
+                return RedirectToAction(nameof(AdicionarItens));
+            }
+
             TempData["Mensagem"] = "Item adicionado!";
-            return RedirectToAction("AdicionarItens");
+            return RedirectToAction(nameof(AdicionarItens));
         }
 
         [HttpPost]
@@ -108,6 +149,12 @@ namespace InfiniteCoffee2.Controllers
         public IActionResult Pagamento()
         {
             var pedidoId = HttpContext.Session.GetInt32("pedidoId") ?? 0;
+            if (pedidoId <= 0)
+            {
+                TempData["Mensagem"] = "Nenhum atendimento ativo. Inicie um novo pedido.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var total    = Banco.CalcularTotalPedido(pedidoId);
             var itens    = Banco.ListarItensPedido(pedidoId);
             if (itens.Count == 0)
@@ -125,6 +172,11 @@ namespace InfiniteCoffee2.Controllers
         [HttpPost]
         public IActionResult Cancelar()
         {
+            // O beacon executado no pagehide também ocorre ao voltar ou atualizar a página.
+            // Só o formulário explícito de cancelamento deve apagar o pedido em aberto.
+            if (!Request.HasFormContentType)
+                return NoContent();
+
             var pedidoId = HttpContext.Session.GetInt32("pedidoId") ?? 0;
             var mesaId = HttpContext.Session.GetInt32("mesaId") ?? 0;
             if (pedidoId > 0 && mesaId > 0)
@@ -139,8 +191,21 @@ namespace InfiniteCoffee2.Controllers
             var pedidoId = HttpContext.Session.GetInt32("pedidoId") ?? 0;
             var mesaId   = HttpContext.Session.GetInt32("mesaId") ?? 0;
             var clienteId = HttpContext.Session.GetInt32("clienteId") ?? 0;
-            var total    = Banco.CalcularTotalPedido(pedidoId);
+
+            if (pedidoId <= 0 || mesaId <= 0)
+            {
+                TempData["Mensagem"] = "O atendimento expirou. Confira o pedido e tente novamente.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var cliente = Banco.BuscarClientePorId(clienteId);
+            if (!Banco.FinalizarAtendimento(pedidoId, forma, out var mensagem))
+            {
+                TempData["Mensagem"] = mensagem;
+                return RedirectToAction(nameof(AdicionarItens));
+            }
+
+            var total = Banco.CalcularTotalPedido(pedidoId);
             var itens = Banco.ListarItensPedido(pedidoId)
                 .Select(item => new ItemConfirmacaoViewModel
                 {
@@ -148,10 +213,6 @@ namespace InfiniteCoffee2.Controllers
                     Quantidade = Convert.ToInt32(item["quantidade"]),
                     Subtotal = Convert.ToDecimal(item["subtotal"])
                 }).ToList();
-
-            Banco.RegistrarPagamento(pedidoId, forma, total);
-            Banco.FinalizarPedido(pedidoId);
-            Banco.AtualizarStatusMesa(mesaId, "Disponível");
 
             var confirmacao = new ConfirmacaoAtendimentoViewModel
             {

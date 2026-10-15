@@ -5,10 +5,9 @@ description: Use when adding functionality to existing web screens without chang
 
 # Preservacao de Telas
 
-1. Nao remova telas, HTML, CSS ou rotas existentes.
-2. Nao mova arquivos existentes.
-3. Adicione novas telas, componentes, endpoints ou scripts quando necessario.
-4. Preserve nomes de campos, links e contratos atuais.
-5. Se uma tela precisar de funcionalidade nova, adicione sem apagar a funcionalidade anterior.
-6. Mantenha acessibilidade e responsividade.
-7. Confirme o impacto antes de alterar uma tela existente.
+1. A branch `CdmEdu` é a fonte oficial para criar ou alterar Views Razor, HTML, CSS e componentes visuais do site.
+2. Em outras branches, não edite esses arquivos; implemente regras no controller/backend ou encaminhe a mudança visual para integração pela `CdmEdu`.
+3. Não remova telas ou rotas e preserve nomes de campos, links e contratos existentes.
+4. Não mova arquivos existentes.
+5. Ao adicionar comportamento, mantenha as ações já existentes e valide acessibilidade/responsividade na branch autorizada.
+6. Confirme o impacto em rotas, verbos HTTP e contratos antes de integrar uma mudança visual.

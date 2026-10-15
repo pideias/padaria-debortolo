@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/product.dart';
+import '../models/sales_by_product.dart';
 import '../services/inventory_api.dart';
 
 class InventoryRepository {
@@ -46,6 +47,8 @@ class InventoryRepository {
 
   Future<List<Map<String, dynamic>>> getSalesHistory() =>
       _api.getSalesHistory();
+
+  Future<List<SalesByProduct>> getSalesByProduct() => _api.getSalesByProduct();
 
   Future<ExitResult> updateProduct({
     required Product product,

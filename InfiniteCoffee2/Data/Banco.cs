@@ -354,7 +354,7 @@ namespace InfiniteCoffee2.Data
             conn.Open();
 
             // Diferencia "nenhuma alteracao" de uma limpeza completa do servidor,
-            // permitindo que o app remova um cache Hive antigo com seguranca.
+            // permitindo que o app remova um cache local antigo com seguranca.
             using (var count = new SqlCommand("SELECT COUNT(*) FROM Produtos WHERE ativo = 1", conn))
                 snapshot.ProdutosTotal = Convert.ToInt32(count.ExecuteScalar());
 
@@ -526,6 +526,43 @@ namespace InfiniteCoffee2.Data
             return lista;
         }
 
+        public static List<Dictionary<string, object>> VendasPorProduto()
+        {
+            var lista = new List<Dictionary<string, object>>();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT p.id_produto,
+                       p.nome_produto,
+                       SUM(i.quantidade) AS quantidade_vendida,
+                       SUM(i.quantidade * i.preco_unitario) AS faturamento
+                FROM Itens_Pedidos i
+                INNER JOIN Pedidos pe ON pe.id_pedido = i.pedidoid
+                INNER JOIN Produtos p ON p.id_produto = i.produtoid
+                WHERE pe.status_pedido = @status
+                  AND EXISTS (
+                      SELECT 1 FROM Pagamentos pg WHERE pg.pedidoid = pe.id_pedido
+                  )
+                GROUP BY p.id_produto, p.nome_produto
+                HAVING SUM(i.quantidade) > 0
+                ORDER BY SUM(i.quantidade) DESC, p.nome_produto ASC", conn);
+            cmd.Parameters.Add("@status", SqlDbType.VarChar, 100).Value = "Finalizado";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["id_produto"] = reader["id_produto"],
+                    ["nome_produto"] = reader["nome_produto"],
+                    ["quantidade_vendida"] = reader["quantidade_vendida"],
+                    ["faturamento"] = reader["faturamento"]
+                });
+            }
+
+            return lista;
+        }
+
         public static int FinalizarVenda(int? clienteId, int? mesaId, int? funcionarioId, string formaPagamento, IEnumerable<SaleItemData> itens, string? clienteNome = null)
         {
             GarantirTabelaMovimentacoes();
@@ -683,16 +720,80 @@ namespace InfiniteCoffee2.Data
             }
         }
 
-        public static void AdicionarItemPedido(int pedidoId, int produtoId, int quantidade)
+        public static bool AdicionarItemPedido(
+            int pedidoId,
+            int produtoId,
+            int quantidade,
+            out int quantidadeDisponivel)
         {
-            using (var conn = new SqlConnection(connectionString))
+            quantidadeDisponivel = -1;
+            if (pedidoId <= 0 || produtoId <= 0 || quantidade < 1) return false;
+
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction(IsolationLevel.Serializable);
+            try
             {
-                conn.Open();
-                var cmd = new SqlCommand("sp_AdicionarItemPedido", conn) { CommandType = CommandType.StoredProcedure };
+                using (var pedido = new SqlCommand(
+                    "SELECT status_pedido FROM Pedidos WITH (UPDLOCK, HOLDLOCK) WHERE id_pedido = @pedidoId",
+                    conn,
+                    transaction))
+                {
+                    pedido.Parameters.AddWithValue("@pedidoId", pedidoId);
+                    var status = pedido.ExecuteScalar()?.ToString();
+                    if (!string.Equals(status, "Aberto", StringComparison.OrdinalIgnoreCase))
+                    {
+                        transaction.Rollback();
+                        return false;
+                    }
+                }
+
+                using (var estoque = new SqlCommand(@"
+                    SELECT p.quantidade_estoque - ISNULL(SUM(i.quantidade), 0)
+                    FROM Produtos p WITH (UPDLOCK, HOLDLOCK)
+                    LEFT JOIN Itens_Pedidos i
+                      ON i.produtoid = p.id_produto AND i.pedidoid = @pedidoId
+                    WHERE p.id_produto = @produtoId AND p.ativo = 1
+                    GROUP BY p.quantidade_estoque", conn, transaction))
+                {
+                    estoque.Parameters.AddWithValue("@pedidoId", pedidoId);
+                    estoque.Parameters.AddWithValue("@produtoId", produtoId);
+                    var saldo = estoque.ExecuteScalar();
+                    if (saldo is null or DBNull)
+                    {
+                        transaction.Rollback();
+                        return false;
+                    }
+
+                    quantidadeDisponivel = Math.Max(0, Convert.ToInt32(saldo));
+                }
+
+                if (quantidade > quantidadeDisponivel)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                using var cmd = new SqlCommand("sp_AdicionarItemPedido", conn, transaction)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
                 cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
                 cmd.Parameters.AddWithValue("@produtoId", produtoId);
                 cmd.Parameters.AddWithValue("@quantidade", quantidade);
-                cmd.ExecuteNonQuery();
+                if (cmd.ExecuteNonQuery() <= 0)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                transaction.Commit();
+                return true;
+            }
+            catch
+            {
+                if (transaction.Connection is not null) transaction.Rollback();
+                throw;
             }
         }
 
@@ -760,13 +861,253 @@ namespace InfiniteCoffee2.Data
 
         public static void FinalizarPedido(int pedidoId)
         {
-            using (var conn = new SqlConnection(connectionString))
+            if (!FecharPedidoComBaixaEstoque(pedidoId, null, out var mensagem))
+                throw new InvalidOperationException(mensagem);
+        }
+
+        public static bool FinalizarAtendimento(
+            int pedidoId,
+            string formaPagamento,
+            out string mensagem)
+        {
+            var forma = formaPagamento?.Trim() ?? string.Empty;
+            if (forma is not ("Dinheiro" or "Cartão" or "Pix"))
             {
-                conn.Open();
-                var cmd = new SqlCommand("sp_FinalizarPedido", conn) { CommandType = CommandType.StoredProcedure };
-                cmd.Parameters.AddWithValue("@pedidoId", pedidoId);
-                cmd.ExecuteNonQuery();
+                mensagem = "Selecione uma forma de pagamento válida.";
+                return false;
             }
+
+            return FecharPedidoTransacional(pedidoId, null, forma, out mensagem);
+        }
+
+        public static bool FecharPedidoComBaixaEstoque(
+            int pedidoId,
+            int? mesaId,
+            out string mensagem)
+        {
+            return FecharPedidoTransacional(pedidoId, mesaId, null, out mensagem);
+        }
+
+        private static bool FecharPedidoTransacional(
+            int pedidoId,
+            int? mesaIdEsperada,
+            string? formaPagamento,
+            out string mensagem)
+        {
+            mensagem = "Não foi possível finalizar o pedido.";
+            if (pedidoId <= 0)
+            {
+                mensagem = "Pedido inválido.";
+                return false;
+            }
+
+            GarantirTabelaMovimentacoes();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                int? mesaId = null;
+                var pedidoEncontrado = false;
+                var pedidoAberto = false;
+                using (var pedido = new SqlCommand(
+                    "SELECT status_pedido, mesaid FROM Pedidos WITH (UPDLOCK, HOLDLOCK) WHERE id_pedido = @pedidoId",
+                    conn,
+                    transaction))
+                {
+                    pedido.Parameters.AddWithValue("@pedidoId", pedidoId);
+                    using var reader = pedido.ExecuteReader();
+                    if (reader.Read())
+                    {
+                        pedidoEncontrado = true;
+                        pedidoAberto = string.Equals(
+                            reader["status_pedido"].ToString(),
+                            "Aberto",
+                            StringComparison.OrdinalIgnoreCase);
+                        mesaId = Convert.IsDBNull(reader["mesaid"])
+                            ? null
+                            : Convert.ToInt32(reader["mesaid"]);
+                    }
+                }
+
+                if (!pedidoEncontrado)
+                {
+                    transaction.Rollback();
+                    mensagem = "O pedido não foi encontrado.";
+                    return false;
+                }
+                if (!pedidoAberto)
+                {
+                    transaction.Rollback();
+                    mensagem = "Este pedido já foi finalizado ou cancelado.";
+                    return false;
+                }
+
+                if (mesaIdEsperada.HasValue && mesaId != mesaIdEsperada)
+                {
+                    transaction.Rollback();
+                    mensagem = "A mesa informada não corresponde ao pedido.";
+                    return false;
+                }
+
+                if (!BaixarEstoqueDosItensPedido(pedidoId, conn, transaction, out mensagem))
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                var total = CalcularTotalPedidoNaTransacao(pedidoId, conn, transaction);
+                if (formaPagamento is not null)
+                {
+                    using var pagamento = new SqlCommand(
+                        "INSERT INTO Pagamentos (pedidoid, forma_pagamento, valor_total) VALUES (@pedidoId, @forma, @valor)",
+                        conn,
+                        transaction);
+                    pagamento.Parameters.AddWithValue("@pedidoId", pedidoId);
+                    pagamento.Parameters.AddWithValue("@forma", formaPagamento);
+                    pagamento.Parameters.AddWithValue("@valor", total);
+                    pagamento.ExecuteNonQuery();
+                }
+
+                using (var finalizar = new SqlCommand(
+                    "UPDATE Pedidos SET status_pedido = 'Finalizado' WHERE id_pedido = @pedidoId AND status_pedido = 'Aberto'",
+                    conn,
+                    transaction))
+                {
+                    finalizar.Parameters.AddWithValue("@pedidoId", pedidoId);
+                    if (finalizar.ExecuteNonQuery() < 1)
+                    {
+                        transaction.Rollback();
+                        mensagem = "O pedido mudou de estado e não pôde ser finalizado.";
+                        return false;
+                    }
+                }
+
+                if (mesaId.HasValue)
+                {
+                    using var mesa = new SqlCommand(
+                        "UPDATE Mesas SET status_mesa = 'Disponível' WHERE id_mesa = @mesaId AND status_mesa = 'Ocupada'",
+                        conn,
+                        transaction);
+                    mesa.Parameters.AddWithValue("@mesaId", mesaId.Value);
+                    mesa.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                mensagem = formaPagamento is null
+                    ? "Pedido fechado e estoque atualizado."
+                    : "Venda finalizada e estoque atualizado.";
+                return true;
+            }
+            catch
+            {
+                if (transaction.Connection is not null) transaction.Rollback();
+                throw;
+            }
+        }
+
+        private static bool BaixarEstoqueDosItensPedido(
+            int pedidoId,
+            SqlConnection conn,
+            SqlTransaction transaction,
+            out string mensagem)
+        {
+            mensagem = string.Empty;
+            var itens = new List<(int ProdutoId, int Quantidade)>();
+            using (var command = new SqlCommand(@"
+                SELECT produtoid, SUM(quantidade) AS quantidade
+                FROM Itens_Pedidos
+                WHERE pedidoid = @pedidoId
+                GROUP BY produtoid", conn, transaction))
+            {
+                command.Parameters.AddWithValue("@pedidoId", pedidoId);
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                    itens.Add((Convert.ToInt32(reader["produtoid"]), Convert.ToInt32(reader["quantidade"])));
+            }
+
+            if (itens.Count == 0)
+            {
+                mensagem = "Adicione ao menos um item antes de finalizar o pedido.";
+                return false;
+            }
+
+            foreach (var item in itens)
+            {
+                if (item.Quantidade < 1)
+                {
+                    mensagem = "O pedido contém uma quantidade inválida.";
+                    return false;
+                }
+
+                string nomeProduto;
+                int saldo;
+                using (var produto = new SqlCommand(
+                    "SELECT nome_produto, quantidade_estoque FROM Produtos WITH (UPDLOCK, HOLDLOCK) WHERE id_produto = @produtoId AND ativo = 1",
+                    conn,
+                    transaction))
+                {
+                    produto.Parameters.AddWithValue("@produtoId", item.ProdutoId);
+                    using var reader = produto.ExecuteReader();
+                    if (!reader.Read())
+                    {
+                        mensagem = "Um produto do pedido não está mais disponível.";
+                        return false;
+                    }
+
+                    nomeProduto = reader["nome_produto"].ToString() ?? "Produto";
+                    saldo = Convert.ToInt32(reader["quantidade_estoque"]);
+                }
+
+                if (saldo < item.Quantidade)
+                {
+                    mensagem = $"Estoque insuficiente para {nomeProduto}. Disponível: {saldo} unidade(s).";
+                    return false;
+                }
+
+                using (var baixa = new SqlCommand(@"
+                    UPDATE Produtos
+                    SET quantidade_estoque = quantidade_estoque - @quantidade
+                    WHERE id_produto = @produtoId AND ativo = 1 AND quantidade_estoque >= @quantidade",
+                    conn,
+                    transaction))
+                {
+                    baixa.Parameters.AddWithValue("@produtoId", item.ProdutoId);
+                    baixa.Parameters.AddWithValue("@quantidade", item.Quantidade);
+                    if (baixa.ExecuteNonQuery() < 1)
+                    {
+                        mensagem = $"O estoque de {nomeProduto} mudou. Atualize o pedido e tente novamente.";
+                        return false;
+                    }
+                }
+
+                using var movimento = new SqlCommand(@"
+                    INSERT INTO MovimentacoesEstoque
+                        (produtoid, tipo_movimentacao, quantidade, motivo, data_movimentacao)
+                    VALUES
+                        (@produtoId, 'Saida', @quantidade, @motivo, GETDATE())",
+                    conn,
+                    transaction);
+                movimento.Parameters.AddWithValue("@produtoId", item.ProdutoId);
+                movimento.Parameters.AddWithValue("@quantidade", item.Quantidade);
+                movimento.Parameters.AddWithValue("@motivo", $"Venda no site - Pedido {pedidoId}");
+                movimento.ExecuteNonQuery();
+            }
+
+            return true;
+        }
+
+        private static decimal CalcularTotalPedidoNaTransacao(
+            int pedidoId,
+            SqlConnection conn,
+            SqlTransaction transaction)
+        {
+            using var command = new SqlCommand(
+                "SELECT ISNULL(SUM(quantidade * preco_unitario), 0) FROM Itens_Pedidos WHERE pedidoid = @pedidoId",
+                conn,
+                transaction);
+            command.Parameters.AddWithValue("@pedidoId", pedidoId);
+            return Convert.ToDecimal(command.ExecuteScalar());
         }
 
         public static void CancelarAtendimento(int pedidoId, int mesaId)
@@ -776,6 +1117,29 @@ namespace InfiniteCoffee2.Data
             using var transaction = conn.BeginTransaction();
             try
             {
+                var pedidoPodeCancelar = false;
+                using (var validar = new SqlCommand(
+                    "SELECT mesaid, status_pedido FROM Pedidos WITH (UPDLOCK, HOLDLOCK) WHERE id_pedido = @pedidoId",
+                    conn,
+                    transaction))
+                {
+                    validar.Parameters.AddWithValue("@pedidoId", pedidoId);
+                    using var reader = validar.ExecuteReader();
+                    if (reader.Read())
+                    {
+                        pedidoPodeCancelar =
+                            string.Equals(reader["status_pedido"].ToString(), "Aberto", StringComparison.OrdinalIgnoreCase) &&
+                            !Convert.IsDBNull(reader["mesaid"]) &&
+                            Convert.ToInt32(reader["mesaid"]) == mesaId;
+                    }
+                }
+
+                if (!pedidoPodeCancelar)
+                {
+                    transaction.Rollback();
+                    return;
+                }
+
                 using var itens = new SqlCommand("DELETE FROM Itens_Pedidos WHERE pedidoid = @pedidoId", conn, transaction);
                 itens.Parameters.AddWithValue("@pedidoId", pedidoId);
                 itens.ExecuteNonQuery();
