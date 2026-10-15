@@ -94,3 +94,173 @@ jobs:
         with:
           name: application-log
           path: app.log
+
+  deploy-hostinger:
+    name: Deploy API to Hostinger KVM
+    needs: validate
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.HOSTINGER_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: hostinger-api-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      HOSTINGER_HOST: ${{ secrets.HOSTINGER_HOST }}
+      HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+      HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT || '22' }}
+      HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+      HOSTINGER_KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+
+    steps:
+      - name: Checkout validated revision
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check Hostinger deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in HOSTINGER_HOST HOSTINGER_USER HOSTINGER_SSH_PRIVATE_KEY HOSTINGER_KNOWN_HOSTS; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing required GitHub Actions secret: ${name}"
+              exit 1
+            fi
+          done
+
+      - name: Publish API for Linux x64
+        shell: bash
+        run: |
+          set -euo pipefail
+          publish_dir="$RUNNER_TEMP/padaria-api-publish"
+          dotnet publish InfiniteCoffee2/InfiniteCoffee2.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained false \
+            --output "$publish_dir"
+          test -f "$publish_dir/InfiniteCoffee2.dll"
+          if [[ -e "$publish_dir/app.env" ]]; then
+            echo "Refusing to deploy: app.env must remain only on the VM."
+            exit 1
+          fi
+          deploy_id="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -C "$publish_dir" -czf "$RUNNER_TEMP/padaria-api-${deploy_id}.tar.gz" .
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$HOSTINGER_SSH_PRIVATE_KEY" > "$RUNNER_TEMP/hostinger_deploy_key"
+          chmod 600 "$RUNNER_TEMP/hostinger_deploy_key"
+          printf '%s\n' "$HOSTINGER_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -i "$RUNNER_TEMP/hostinger_deploy_key" \
+            -P "$HOSTINGER_SSH_PORT" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$RUNNER_TEMP/padaria-api-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz" \
+            "$HOSTINGER_USER@$HOSTINGER_HOST:/tmp/padaria-api-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+
+      - name: Install, restart and health-check API
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i "$RUNNER_TEMP/hostinger_deploy_key" \
+            -p "$HOSTINGER_SSH_PORT" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$HOSTINGER_USER@$HOSTINGER_HOST" \
+            "bash -s -- '$GITHUB_SHA' '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'" <<'REMOTE'
+          set -euo pipefail
+          sha="$1"
+          run_id="$2"
+          run_attempt="$3"
+          deploy_id="${sha}-${run_id}-${run_attempt}"
+          target=/opt/padaria-api
+          service=padaria-api
+          archive="/tmp/padaria-api-${deploy_id}.tar.gz"
+          stage="/tmp/padaria-api-stage-${deploy_id}"
+          candidate="/opt/padaria-api-candidate-${deploy_id}"
+          backup_dir=/opt/padaria-api-backups
+          backup="${backup_dir}/padaria-api-${deploy_id}"
+          failed="/opt/padaria-api-failed-${deploy_id}"
+
+          run_privileged() {
+            if [[ "$(id -u)" -eq 0 ]]; then
+              "$@"
+            else
+              sudo -n "$@"
+            fi
+          }
+
+          test -f "$archive"
+          run_privileged test -f "$target/app.env"
+          mkdir -m 700 "$stage"
+          tar -xzf "$archive" -C "$stage"
+          test -f "$stage/InfiniteCoffee2.dll"
+          if [[ -e "$stage/app.env" ]]; then
+            echo "Refusing to overwrite the VM's app.env."
+            exit 1
+          fi
+
+          umask 077
+          run_privileged install -d -m 700 "$backup_dir"
+          run_privileged install -d -m 755 "$candidate"
+          run_privileged cp -a "$stage/." "$candidate/"
+          run_privileged cp -a "$target/app.env" "$candidate/app.env"
+          run_privileged chown -R --reference="$target" "$candidate"
+          run_privileged chmod --reference="$target" "$candidate"
+
+          run_privileged systemctl stop "$service"
+          if ! run_privileged mv "$target" "$backup"; then
+            run_privileged systemctl start "$service" || true
+            exit 1
+          fi
+          if ! run_privileged mv "$candidate" "$target"; then
+            run_privileged mv "$backup" "$target"
+            run_privileged systemctl start "$service"
+            exit 1
+          fi
+          if ! run_privileged systemctl start "$service"; then
+            run_privileged mv "$target" "$failed"
+            run_privileged mv "$backup" "$target"
+            run_privileged systemctl start "$service"
+            exit 1
+          fi
+
+          healthy=0
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8080/api/health; then
+              healthy=1
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$healthy" -ne 1 ]]; then
+            run_privileged journalctl -u "$service" -n 60 --no-pager || true
+            run_privileged systemctl stop "$service" || true
+            run_privileged mv "$target" "$failed"
+            run_privileged mv "$backup" "$target"
+            run_privileged systemctl start "$service"
+            exit 1
+          fi
+
+          rm -rf -- "$stage"
+          rm -f -- "$archive"
+          REMOTE
+
+      - name: Remove temporary SSH key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/hostinger_deploy_key"

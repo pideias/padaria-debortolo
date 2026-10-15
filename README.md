@@ -1,10 +1,14 @@
 ## Guia rapido
 
-Para entender o projeto completo, os contratos da API, o fluxo Flutter/Hive, o sync e as regras
+Para entender o projeto completo, os contratos da API, o fluxo Flutter, a sincronização e as regras
 para outras IAs, leia primeiro [`DOCUMENTACAO-IA.md`](DOCUMENTACAO-IA.md) e [`AGENTS.md`](AGENTS.md).
 
-O backend usa SQL Server; o app Flutter usa Hive como espelho offline. Windows, Android e Web
-usam o mesmo codigo Flutter e conversam com o servidor pela API REST.
+Para configurar a publicação automática da API na VM Hostinger, consulte
+[`DEPLOY-HOSTINGER.md`](DEPLOY-HOSTINGER.md).
+
+O SQL Server é a fonte oficial. O aplicativo Flutter usa `shared_preferences` para manter o
+catálogo em cache e uma fila local de operações offline. Windows, Android e Web usam o mesmo
+código Flutter e conversam com o servidor pela API REST.
 
 Para o codigo funcionar precisa criar e conectar o banco de dados primeiro, a seguir estão os comandos do banco de dados;
 Os incertes que eu coloquei são apenas para testar, voce pode adicionar os incertes direto pelo programa em C#.

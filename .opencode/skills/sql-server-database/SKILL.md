@@ -22,6 +22,10 @@ Trate o banco como sistema persistente e compartilhado, nunca como dados descart
 - Para produtos com historico, use inativacao (`ativo = 0`) e estoque zero; nunca apague vendas ou itens.
 - Scripts de schema devem ser versionados, revisaveis e, quando possivel, idempotentes.
 - Nunca inclua credenciais em scripts, commits ou mensagens de erro.
+- No atendimento web, limite a quantidade do item ao saldo restante do produto no pedido.
+- Na venda, revalide estoque e, em uma única transação, baixe `Produtos.quantidade_estoque`, insira `MovimentacoesEstoque`, registre `Pagamentos` e finalize `Pedidos`.
+- Se um item não tiver saldo na confirmação, faça rollback integral e mantenha o pedido aberto para ajuste.
+- O relatório por produto deve agregar quantidades e faturamento a partir do preço persistido em `Itens_Pedidos`, somente para pedidos finalizados com pagamento registrado.
 
 ## Validacao
 

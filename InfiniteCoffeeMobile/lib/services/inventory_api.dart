@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 
 import '../models/product.dart';
+import '../models/sales_by_product.dart';
 
 class InventoryApi {
   InventoryApi({http.Client? client}) : _client = client ?? http.Client();
@@ -175,6 +176,26 @@ class InventoryApi {
     }
     return (jsonDecode(response.body) as List<dynamic>)
         .cast<Map<String, dynamic>>();
+  }
+
+  Future<List<SalesByProduct>> getSalesByProduct() async {
+    final response = await _client
+        .get(
+          Uri.parse('$baseUrl/api/relatorios/vendas/produtos'),
+          headers: _headers(),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Nao foi possivel carregar o relatorio de vendas por produto.',
+        response.statusCode,
+      );
+    }
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((item) => SalesByProduct.fromJson(item as Map<String, dynamic>))
+        .where((item) => item.quantitySold > 0)
+        .toList();
   }
 
   Future<void> updateProduct({

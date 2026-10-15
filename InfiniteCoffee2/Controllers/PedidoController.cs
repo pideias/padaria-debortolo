@@ -14,9 +14,13 @@ namespace InfiniteCoffee2.Controllers
         [HttpPost]
         public IActionResult Fechar(int pedidoId, int mesaId)
         {
-            Banco.FinalizarPedido(pedidoId);
-            Banco.AtualizarStatusMesa(mesaId, "Disponível");
-            TempData["Mensagem"] = "Pedido finalizado e mesa liberada!";
+            if (!Banco.FecharPedidoComBaixaEstoque(pedidoId, mesaId, out var mensagem))
+            {
+                TempData["Mensagem"] = mensagem;
+                return RedirectToAction("Index");
+            }
+
+            TempData["Mensagem"] = mensagem;
             return RedirectToAction("Index");
         }
     }

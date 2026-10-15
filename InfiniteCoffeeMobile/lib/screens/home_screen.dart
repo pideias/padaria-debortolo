@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../repositories/inventory_repository.dart';
 import '../utils/product_search.dart';
+import 'sales_report_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.repository});
@@ -109,7 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 onRemove: _removeFromCart,
                 onFinish: _finishSale,
               )
-            : _SalesHistory(repository: widget.repository);
+            : _selectedIndex == 4
+            ? _SalesHistory(repository: widget.repository)
+            : SalesReportScreen(repository: widget.repository);
       },
     );
 
@@ -188,6 +191,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icon(Icons.receipt_long_outlined),
                   selectedIcon: Icon(Icons.receipt_long),
                   label: 'Vendas',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.pie_chart_outline),
+                  selectedIcon: Icon(Icons.pie_chart),
+                  label: 'Relatórios',
                 ),
               ],
             ),
@@ -575,6 +583,11 @@ class _DesktopNavigation extends StatelessWidget {
                   icon: Icon(Icons.receipt_long_outlined),
                   selectedIcon: Icon(Icons.receipt_long),
                   label: Text('Vendas'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.pie_chart_outline),
+                  selectedIcon: Icon(Icons.pie_chart),
+                  label: Text('Relatórios'),
                 ),
               ],
             ),

@@ -68,22 +68,20 @@ Estas regras valem para todo trabalho neste repositorio.
 - Nao altere ou remova telas HTML existentes; adicione novas rotas ou arquivos quando necessario.
 - Apos alterar Dart, execute formatacao, analise, testes e build do alvo afetado.
 
-## Arquitetura alvo e plataformas
+## Arquitetura atual e plataformas
 
-- Um unico codigo Flutter (`infinite_coffee_app`) gera Windows (`flutter build windows`,
-  exe em `build\windows\x64\runner\Release\infinite_coffee_app.exe`) e mobile
-  (`flutter build apk`). Os dois sao o mesmo app em plataformas diferentes.
-- O app embute um banco local **Hive** (offline-first, sem SQLite) que ja vem populado apos o primeiro sync.
-- A "conversa entre Windows/mobile" e a web acontece SEMPRE via a API REST
-  (`/api/*` no SQL Server), nunca peer-to-peer. Venda no mobile sobe para o servidor e o
-  Windows enxerga no proximo pull; e vice-versa.
-- Sync bidirecional: `GET /api/sync/pull?since={token}` (server -> app) e
-  `POST /api/sync/push` (app -> server, operacoes offline). Detalhes na skill `sync-architecture`.
-- Rede: app Windows usa `http://localhost:5049`; app mobile na mesma LAN usa o IP da maquina
-  (ex.: `http://192.168.x.x:5049`). O CORS em `Program.cs` deve liberar essa origem.
-- SQL Server continua sendo a fonte da verdade; Hive no app e um espelho offline.
-- O banco remoto de producao/demonstracao pode ser hospedado em uma VM x86 da Oracle Cloud;
-  use `OracleCloud/README.md` e nunca coloque senha na connection string versionada.
+- O aplicativo Flutter/Dart em `InfiniteCoffeeMobile` pode ser compilado para Android, Windows e Web.
+- O cliente chama a API REST ASP.NET Core .NET 10; não acessa o SQL Server diretamente.
+- SQL Server é a fonte oficial. No cliente, `shared_preferences` mantém o catálogo (`cached_products`)
+  e a fila de operações (`pending_stock_exits`); não há Hive implementado no código atual.
+- O cliente consulta o catálogo por `GET /api/estoque`. Entradas, saídas e vendas podem ficar na fila
+  local e são reenviadas a `POST /api/sync/push`; o backend valida estoque e persiste a operação.
+- Embora o backend exponha `GET /api/sync/pull`, o cliente atual não consome esse endpoint como pull
+  incremental. Não descreva a sincronização do app como bidirecional até essa funcionalidade existir.
+- `API_BASE_URL` configura consultas e `API_WRITE_BASE_URL` pode configurar gravações. No Android,
+  `localhost` aponta para o próprio aparelho; use o endereço do servidor acessível pelo dispositivo.
+- O deploy da API na VM Hostinger está descrito em `DEPLOY-HOSTINGER.md`; o workflow é habilitado
+  somente após configurar os secrets e `HOSTINGER_DEPLOY_ENABLED=true`.
 
 ## Preservacao de historico
 
