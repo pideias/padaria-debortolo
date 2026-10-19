@@ -48,6 +48,11 @@ $env:PADARIA_CONNECTION_STRING="Server=localhost\KAIO;Database=infiniteCoffee;Tr
 O `Program.cs` prioriza `PADARIA_CONNECTION_STRING` e usa `ConnectionStrings:DefaultConnection`
 apenas quando a variavel nao estiver definida.
 
+Antes de publicar a API com o gerenciamento de clientes, funcionários e mesas, aplique
+`DatabaseScripts/UpgradeEntityManagement.sql` no banco `infiniteCoffee`. O script adiciona as
+flags `ativo` sem remover dados. Não reaplique `InstallDatabase.sql` ao banco vazio da Hostinger:
+esse script também contém inserts demonstrativos.
+
 ------ Esse é o banco de dados ------
 
 create database infiniteCoffee
@@ -56,12 +61,14 @@ create table Clientes(
 id_cliente int identity(1,1) primary key,
 nome_cliente varchar (100) not null,
 email varchar (100),
-telefone varchar (20))
+telefone varchar (20),
+ativo bit not null default 1)
 
 create table Funcionarios(
 id_funcionario int identity(1,1) primary key,
 nome_funcionario varchar (100) not null,
-cargo varchar (100) not null)
+cargo varchar (100) not null,
+ativo bit not null default 1)
 
 create table Produtos(
 id_produto int identity(1,1) primary key,
@@ -73,7 +80,8 @@ create table Mesas(
 id_mesa int identity(1,1) primary key,
 numero int not null,
 capacidade int not null,
-status_mesa varchar (60) not null)
+status_mesa varchar (60) not null,
+ativo bit not null default 1)
 
 create table Pedidos(
 id_pedido int identity(1,1) primary key,
@@ -105,7 +113,7 @@ GO
 CREATE PROCEDURE sp_ListarClientes
 AS
 BEGIN
-    SELECT * FROM Clientes
+    SELECT * FROM Clientes WHERE ativo = 1
 END
 GO
 
@@ -114,8 +122,8 @@ CREATE PROCEDURE sp_BuscarCliente
 AS
 BEGIN
     SELECT * FROM Clientes
-    WHERE nome_cliente LIKE '%' + @valor + '%'
-       OR email LIKE '%' + @valor + '%'
+    WHERE ativo = 1 AND (nome_cliente LIKE '%' + @valor + '%'
+       OR email LIKE '%' + @valor + '%')
 END
 GO
 
@@ -149,28 +157,7 @@ CREATE PROCEDURE sp_ExcluirCliente
     @id INT
 AS
 BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- Remove os dados dependentes antes do cliente para respeitar as foreign keys.
-        DELETE FROM Pagamentos
-        WHERE pedidoid IN (SELECT id_pedido FROM Pedidos WHERE clienteid = @id);
-
-        DELETE FROM Itens_Pedidos
-        WHERE pedidoid IN (SELECT id_pedido FROM Pedidos WHERE clienteid = @id);
-
-        DELETE FROM Pedidos WHERE clienteid = @id;
-        DELETE FROM Clientes WHERE id_cliente = @id;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH
+    UPDATE Clientes SET ativo = 0 WHERE id_cliente = @id AND ativo = 1;
 END
 GO
 
@@ -203,14 +190,14 @@ GO
 CREATE PROCEDURE sp_ListarMesas
 AS
 BEGIN
-    SELECT * FROM Mesas
+    SELECT * FROM Mesas WHERE ativo = 1
 END
 GO
 
 CREATE PROCEDURE sp_ListarMesasLivres
 AS
 BEGIN
-    SELECT * FROM Mesas WHERE status_mesa = 'Livre'
+    SELECT * FROM Mesas WHERE ativo = 1 AND status_mesa = 'Livre'
 END
 GO
 
@@ -221,7 +208,7 @@ AS
 BEGIN
     UPDATE Mesas
     SET status_mesa = @status
-    WHERE id_mesa = @id
+    WHERE id_mesa = @id AND ativo = 1
 END
 GO
 

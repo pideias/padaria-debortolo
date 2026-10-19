@@ -6,11 +6,18 @@ IF OBJECT_ID('dbo.SyncOperations', 'U') IS NULL
     CREATE TABLE SyncOperations (client_uuid VARCHAR(100) NOT NULL PRIMARY KEY, tipo VARCHAR(30) NOT NULL, created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME());
 
 IF OBJECT_ID('dbo.Clientes', 'U') IS NULL
-    CREATE TABLE Clientes (id_cliente INT IDENTITY(1,1) PRIMARY KEY, nome_cliente VARCHAR(100) NOT NULL, email VARCHAR(100) NULL, telefone VARCHAR(20) NULL);
+    CREATE TABLE Clientes (id_cliente INT IDENTITY(1,1) PRIMARY KEY, nome_cliente VARCHAR(100) NOT NULL, email VARCHAR(100) NULL, telefone VARCHAR(20) NULL, ativo BIT NOT NULL CONSTRAINT DF_Clientes_ativo DEFAULT 1);
 IF OBJECT_ID('dbo.Funcionarios', 'U') IS NULL
-    CREATE TABLE Funcionarios (id_funcionario INT IDENTITY(1,1) PRIMARY KEY, nome_funcionario VARCHAR(100) NOT NULL, cargo VARCHAR(100) NOT NULL);
+    CREATE TABLE Funcionarios (id_funcionario INT IDENTITY(1,1) PRIMARY KEY, nome_funcionario VARCHAR(100) NOT NULL, cargo VARCHAR(100) NOT NULL, ativo BIT NOT NULL CONSTRAINT DF_Funcionarios_ativo DEFAULT 1);
 IF OBJECT_ID('dbo.Mesas', 'U') IS NULL
-    CREATE TABLE Mesas (id_mesa INT IDENTITY(1,1) PRIMARY KEY, numero INT NOT NULL, capacidade INT NOT NULL, status_mesa VARCHAR(60) NOT NULL);
+    CREATE TABLE Mesas (id_mesa INT IDENTITY(1,1) PRIMARY KEY, numero INT NOT NULL, capacidade INT NOT NULL, status_mesa VARCHAR(60) NOT NULL, ativo BIT NOT NULL CONSTRAINT DF_Mesas_ativo DEFAULT 1);
+
+IF COL_LENGTH('dbo.Clientes', 'ativo') IS NULL
+    ALTER TABLE dbo.Clientes ADD ativo BIT NOT NULL CONSTRAINT DF_Clientes_ativo DEFAULT 1 WITH VALUES;
+IF COL_LENGTH('dbo.Funcionarios', 'ativo') IS NULL
+    ALTER TABLE dbo.Funcionarios ADD ativo BIT NOT NULL CONSTRAINT DF_Funcionarios_ativo DEFAULT 1 WITH VALUES;
+IF COL_LENGTH('dbo.Mesas', 'ativo') IS NULL
+    ALTER TABLE dbo.Mesas ADD ativo BIT NOT NULL CONSTRAINT DF_Mesas_ativo DEFAULT 1 WITH VALUES;
 IF OBJECT_ID('dbo.Pedidos', 'U') IS NULL
     CREATE TABLE Pedidos (id_pedido INT IDENTITY(1,1) PRIMARY KEY, mesaid INT NULL REFERENCES Mesas(id_mesa), funcionarioid INT NULL REFERENCES Funcionarios(id_funcionario), clienteid INT NULL REFERENCES Clientes(id_cliente), datahora DATETIME NOT NULL, status_pedido VARCHAR(100) NOT NULL);
 IF OBJECT_ID('dbo.Itens_Pedidos', 'U') IS NULL
@@ -26,19 +33,19 @@ IF NOT EXISTS (SELECT 1 FROM Mesas)
     INSERT INTO Mesas (numero, capacidade, status_mesa) VALUES (1, 4, 'Disponivel'), (2, 4, 'Disponivel'), (3, 6, 'Disponivel');
 
 IF OBJECT_ID('dbo.sp_ListarClientes', 'P') IS NULL
-    EXEC('CREATE PROCEDURE sp_ListarClientes AS SELECT id_cliente, nome_cliente, email, telefone FROM Clientes');
+    EXEC('CREATE PROCEDURE sp_ListarClientes AS SELECT id_cliente, nome_cliente, email, telefone FROM Clientes WHERE ativo = 1');
 IF OBJECT_ID('dbo.sp_BuscarCliente', 'P') IS NULL
-    EXEC('CREATE PROCEDURE sp_BuscarCliente @valor VARCHAR(100) AS SELECT id_cliente, nome_cliente, email, telefone FROM Clientes WHERE nome_cliente LIKE ''%'' + @valor + ''%'' OR email LIKE ''%'' + @valor + ''%''');
+    EXEC('CREATE PROCEDURE sp_BuscarCliente @valor VARCHAR(100) AS SELECT id_cliente, nome_cliente, email, telefone FROM Clientes WHERE ativo = 1 AND (nome_cliente LIKE ''%'' + @valor + ''%'' OR email LIKE ''%'' + @valor + ''%'')');
 IF OBJECT_ID('dbo.sp_CadastrarCliente', 'P') IS NULL
     EXEC('CREATE PROCEDURE sp_CadastrarCliente @nome VARCHAR(100), @email VARCHAR(100), @telefone VARCHAR(20) AS INSERT INTO Clientes (nome_cliente, email, telefone) VALUES (@nome, @email, @telefone)');
 IF OBJECT_ID('dbo.sp_ListarFuncionarios', 'P') IS NULL
-    EXEC('CREATE PROCEDURE sp_ListarFuncionarios AS SELECT id_funcionario, nome_funcionario, cargo FROM Funcionarios');
+    EXEC('CREATE PROCEDURE sp_ListarFuncionarios AS SELECT id_funcionario, nome_funcionario, cargo FROM Funcionarios WHERE ativo = 1');
 IF OBJECT_ID('dbo.sp_ListarMesas', 'P') IS NULL
-    EXEC('CREATE PROCEDURE sp_ListarMesas AS SELECT id_mesa, numero, capacidade, status_mesa FROM Mesas');
+    EXEC('CREATE PROCEDURE sp_ListarMesas AS SELECT id_mesa, numero, capacidade, status_mesa FROM Mesas WHERE ativo = 1');
 IF OBJECT_ID('dbo.sp_ListarMesasLivres', 'P') IS NULL
-    EXEC('CREATE PROCEDURE sp_ListarMesasLivres AS SELECT id_mesa, numero, capacidade, status_mesa FROM Mesas WHERE status_mesa IN (''Livre'', ''Disponivel'')');
+    EXEC('CREATE PROCEDURE sp_ListarMesasLivres AS SELECT id_mesa, numero, capacidade, status_mesa FROM Mesas WHERE ativo = 1 AND status_mesa IN (''Livre'', ''Disponivel'', ''Disponível'')');
 IF OBJECT_ID('dbo.sp_AtualizarStatusMesa', 'P') IS NULL
-    EXEC('CREATE PROCEDURE sp_AtualizarStatusMesa @id INT, @status VARCHAR(60) AS UPDATE Mesas SET status_mesa = @status WHERE id_mesa = @id');
+    EXEC('CREATE PROCEDURE sp_AtualizarStatusMesa @id INT, @status VARCHAR(60) AS UPDATE Mesas SET status_mesa = @status WHERE id_mesa = @id AND ativo = 1');
 IF OBJECT_ID('dbo.sp_ListarPedidosAbertos', 'P') IS NULL
     EXEC('CREATE PROCEDURE sp_ListarPedidosAbertos AS SELECT id_pedido, mesaid, funcionarioid, clienteid, datahora, status_pedido FROM Pedidos WHERE status_pedido = ''Aberto''');
 IF OBJECT_ID('dbo.sp_PedidosDoDia', 'P') IS NULL

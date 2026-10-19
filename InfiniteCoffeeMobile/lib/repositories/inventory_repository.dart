@@ -14,6 +14,8 @@ class InventoryRepository {
   static const _pendingKey = 'pending_stock_exits';
   final InventoryApi _api;
 
+  InventoryApi get api => _api;
+
   Future<InventorySnapshot> load() async {
     try {
       // Keep the full catalog cached; the UI filters it locally as the user types.
