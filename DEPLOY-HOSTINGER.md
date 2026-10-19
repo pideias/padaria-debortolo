@@ -8,6 +8,31 @@ O workflow `Validate` executa análise, testes e smoke tests. O job `deploy-host
 
 O deploy publica somente o backend ASP.NET Core. Não altera o APK/Windows, não executa alterações de schema e não copia o arquivo de configuração `app.env`.
 
+## Addam local (serviço Python separado)
+
+O endpoint `POST /api/addam/chat` encaminha mensagens para um serviço Python local em
+`http://127.0.0.1:8091`. A API devolve `503` se esse serviço não estiver instalado ou ativo. O
+workflow atual não instala nem atualiza esse sidecar; faça isso separadamente na VM:
+
+1. Pelo PowerShell, copie `AddamPython/addam_service.py` e `AddamPython/padaria-addam.service` para `/tmp/` na VM via SCP.
+2. Na VM, crie o usuário de serviço e instale os arquivos:
+
+   ```bash
+   id -u padaria-addam >/dev/null 2>&1 || useradd --system --user-group --home-dir /nonexistent --shell /usr/sbin/nologin padaria-addam
+   install -d -o padaria-addam -g padaria-addam -m 750 /opt/padaria-addam
+   install -o padaria-addam -g padaria-addam -m 640 /tmp/addam_service.py /opt/padaria-addam/addam_service.py
+   install -o root -g root -m 644 /tmp/padaria-addam.service /etc/systemd/system/padaria-addam.service
+   systemctl daemon-reload
+   systemctl enable --now padaria-addam
+   curl -fsS http://127.0.0.1:8091/health
+   ```
+
+3. Confirme `{"status":"ok","assistant":"Addam","mode":"rules"}` e então publique/reinicie a API ASP.NET.
+
+O serviço usa apenas a biblioteca padrão do Python, escuta em loopback e não deve ter a porta `8091`
+aberta no firewall. Esta versão só responde por regras de texto; não consulta nem altera o banco, não
+faz pedidos e não gera PDFs. Não use respostas do chat como autorização para ações administrativas.
+
 ## Configuração no GitHub
 
 Em **Settings → Secrets and variables → Actions**, configure a variável e os secrets:

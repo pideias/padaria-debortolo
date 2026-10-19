@@ -67,6 +67,28 @@ jobs:
         working-directory: InfiniteCoffeeMobile
         run: flutter test
 
+      - name: Setup Python for Addam
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Test Addam rule engine
+        run: python -m unittest discover -s AddamPython -p 'test_*.py'
+
+      - name: Start Addam Python sidecar
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup python3 AddamPython/addam_service.py > addam.log 2>&1 &
+          echo $! > addam.pid
+          for attempt in {1..15}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8091/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8091/health > /dev/null
+
       - name: Start application
         shell: bash
         run: |
@@ -87,13 +109,27 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:5080/ > /dev/null
           curl --fail --silent --show-error http://127.0.0.1:5080/Home/Privacy > /dev/null
           curl --fail --silent --show-error http://127.0.0.1:5080/swagger/index.html > /dev/null
+          addam_response="$(curl --fail --silent --show-error \
+            -H 'Content-Type: application/json' \
+            -d '{"mensagem":"Como consulto o estoque?"}' \
+            http://127.0.0.1:5080/api/addam/chat)"
+          python -c 'import json,sys; data=json.load(sys.stdin); assert data["assistant"] == "Addam"; assert "Estoque" in data["reply"]' <<< "$addam_response"
 
       - name: Upload application log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: application-log
-          path: app.log
+          name: application-and-addam-logs
+          path: |
+            app.log
+            addam.log
+
+      - name: Stop smoke test processes
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f app.pid ]]; then kill "$(cat app.pid)" 2>/dev/null || true; fi
+          if [[ -f addam.pid ]]; then kill "$(cat addam.pid)" 2>/dev/null || true; fi
 
   deploy-hostinger:
     name: Deploy API to Hostinger KVM
