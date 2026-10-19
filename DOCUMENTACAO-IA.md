@@ -51,6 +51,7 @@ Arquivos Flutter principais:
 - `lib/models/product.dart` e `lib/models/sales_by_product.dart`: modelos de resposta.
 - `lib/screens/home_screen.dart`: navegação, estoque, produtos, PDV e histórico.
 - `lib/screens/sales_report_screen.dart`: gráfico de vendas agregadas por produto.
+- `lib/screens/management_screen.dart`: cadastros online de clientes, funcionários e mesas.
 
 ## Contratos REST
 
@@ -76,6 +77,21 @@ Arquivos Flutter principais:
 - `GET /api/relatorios/vendas/produtos`: quantidade e faturamento por produto em pedidos finalizados e pagos.
 - `GET /api/relatorios/estoque`: estoque e alertas.
 
+### Cadastros
+
+- `GET /api/cadastros/clientes?incluirInativos=true`: lista clientes com nome, e-mail, ID e estado.
+- `POST` e `PUT /api/cadastros/clientes[/{id}]`: cria ou atualiza cliente.
+- `DELETE /api/cadastros/clientes/{id}` inativa; `PATCH /api/cadastros/clientes/{id}/ativo` reativa.
+- Os mesmos verbos estão disponíveis em `/api/cadastros/funcionarios` e `/api/cadastros/mesas`.
+- Funcionários usam nome e cargo; mesas usam número e capacidade. IDs são gerados no SQL Server.
+- Excluir é inativar (`ativo = 0`), preservando registros e referências históricas. Mesa ocupada,
+  reservada ou com pedido aberto não pode ser inativada; número de mesa ativa não pode ser duplicado.
+- `sp_CriarPedido` valida os vínculos ativos e cria o pedido com locks transacionais para serializar
+  sua execução com a inativação de mesas, clientes e funcionários.
+- Esses cadastros dependem de rede/API e não entram na fila offline de estoque/vendas.
+- Antes de publicar esse contrato, aplique `DatabaseScripts/UpgradeEntityManagement.sql` uma vez
+  (script idempotente) no banco; ele adiciona as flags `ativo` e atualiza procedures de listagem.
+
 ### Sincronizacao
 
 - `GET /api/sync/pull?since={token}` retorna `serverTime`, `produtosTotal`, `produtos` e
@@ -97,6 +113,8 @@ Arquivos Flutter principais:
 - Foreign keys relacionam pedidos, itens, pagamentos, produtos, clientes, funcionarios e mesas.
 - Produto com historico nao deve sofrer `DELETE` fisico. A exclusao da interface e inativacao:
   `ativo = 0` e `quantidade_estoque = 0`.
+- Clientes, funcionários e mesas também usam exclusão lógica via `ativo = 0`; nunca apague as linhas,
+  pois pedidos existentes podem referenciá-las.
 - A limpeza completa executada no ambiente de testes removeu os registros, nao as tabelas.
   Nunca repetir limpeza em outro ambiente sem confirmacao explicita.
 

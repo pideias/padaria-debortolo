@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../repositories/inventory_repository.dart';
+import 'management_screen.dart';
 import '../utils/product_search.dart';
 import 'sales_report_screen.dart';
 
@@ -61,66 +62,81 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final desktop = MediaQuery.sizeOf(context).width >= 900;
-    final content = FutureBuilder<InventorySnapshot>(
-      future: _stock,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) return _ErrorView(onRetry: _reload);
-        final data =
-            snapshot.data ??
-            const InventorySnapshot(products: [], isOffline: true);
-        final matchingProducts = filterProducts(data.products, _search);
-        return _selectedIndex == 0
-            ? _Dashboard(
-                products: data.products,
-                offline: data.isOffline,
-                onOpenStock: () => setState(() => _selectedIndex = 2),
-              )
-            : _selectedIndex == 1
-            ? _ProductsView(
-                products: matchingProducts,
-                search: _search,
-                onSearch: _setSearch,
-                onEdit: _showProductDialog,
-                onDelete: _deleteProduct,
-              )
-            : _selectedIndex == 2
-            ? _StockView(
-                products: matchingProducts,
-                offline: data.isOffline,
-                errorMessage: data.errorMessage,
-                search: _search,
-                onSearch: _setSearch,
-                onExit: _registerExit,
-                onEntry: _registerEntry,
-                onCreateProduct: _showProductDialog,
-                onEdit: _showProductDialog,
-                onDelete: _deleteProduct,
-                onSync: _syncNow,
-              )
-            : _selectedIndex == 3
-            ? _SaleView(
-                products: matchingProducts,
-                search: _search,
-                onSearch: _setSearch,
-                cart: _cart.values.toList(),
-                onAdd: _addToCart,
-                onRemove: _removeFromCart,
-                onFinish: _finishSale,
-              )
-            : _selectedIndex == 4
-            ? _SalesHistory(repository: widget.repository)
-            : SalesReportScreen(repository: widget.repository);
-      },
-    );
+    final content = _selectedIndex == 6
+        ? ManagementScreen(api: widget.repository.api)
+        : FutureBuilder<InventorySnapshot>(
+            future: _stock,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) return _ErrorView(onRetry: _reload);
+              final data =
+                  snapshot.data ??
+                  const InventorySnapshot(products: [], isOffline: true);
+              final matchingProducts = filterProducts(data.products, _search);
+              return _selectedIndex == 0
+                  ? _Dashboard(
+                      products: data.products,
+                      offline: data.isOffline,
+                      onOpenStock: () => setState(() => _selectedIndex = 2),
+                    )
+                  : _selectedIndex == 1
+                  ? _ProductsView(
+                      products: matchingProducts,
+                      search: _search,
+                      onSearch: _setSearch,
+                      onEdit: _showProductDialog,
+                      onDelete: _deleteProduct,
+                    )
+                  : _selectedIndex == 2
+                  ? _StockView(
+                      products: matchingProducts,
+                      offline: data.isOffline,
+                      errorMessage: data.errorMessage,
+                      search: _search,
+                      onSearch: _setSearch,
+                      onExit: _registerExit,
+                      onEntry: _registerEntry,
+                      onCreateProduct: _showProductDialog,
+                      onEdit: _showProductDialog,
+                      onDelete: _deleteProduct,
+                      onSync: _syncNow,
+                    )
+                  : _selectedIndex == 3
+                  ? _SaleView(
+                      products: matchingProducts,
+                      search: _search,
+                      onSearch: _setSearch,
+                      cart: _cart.values.toList(),
+                      onAdd: _addToCart,
+                      onRemove: _removeFromCart,
+                      onFinish: _finishSale,
+                    )
+                  : _selectedIndex == 4
+                  ? _SalesHistory(repository: widget.repository)
+                  : SalesReportScreen(repository: widget.repository);
+            },
+          );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Padaria Debortolo'),
         toolbarHeight: desktop ? 76 : null,
         actions: [
+          if (!desktop)
+            IconButton(
+              tooltip: 'Cadastros',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Cadastros')),
+                    body: ManagementScreen(api: widget.repository.api),
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.manage_accounts_outlined),
+            ),
           if (desktop)
             const Padding(
               padding: EdgeInsets.only(left: 8, right: 24),
@@ -588,6 +604,11 @@ class _DesktopNavigation extends StatelessWidget {
                   icon: Icon(Icons.pie_chart_outline),
                   selectedIcon: Icon(Icons.pie_chart),
                   label: Text('Relatórios'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.manage_accounts_outlined),
+                  selectedIcon: Icon(Icons.manage_accounts),
+                  label: Text('Cadastros'),
                 ),
               ],
             ),

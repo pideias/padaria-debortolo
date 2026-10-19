@@ -295,6 +295,85 @@ class InventoryApi {
       }
     }
   }
+
+  Future<List<Map<String, dynamic>>> getCadastros(
+    String tipo, {
+    required bool incluirInativos,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/cadastros/$tipo').replace(
+      queryParameters: incluirInativos ? {'incluirInativos': 'true'} : null,
+    );
+    final response = await _client
+        .get(uri, headers: _headers())
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      throw _managementError(
+        response,
+        'Nao foi possivel carregar os cadastros.',
+      );
+    }
+    return (jsonDecode(response.body) as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+  }
+
+  Future<void> saveCadastro(
+    String tipo, {
+    int? id,
+    required Map<String, dynamic> dados,
+  }) async {
+    final uri = Uri.parse(
+      '$writeBaseUrl/api/cadastros/$tipo${id == null ? '' : '/$id'}',
+    );
+    final headers = _headers({'Content-Type': 'application/json'}, true);
+    final response = id == null
+        ? await _client
+              .post(uri, headers: headers, body: jsonEncode(dados))
+              .timeout(const Duration(seconds: 60))
+        : await _client
+              .put(uri, headers: headers, body: jsonEncode(dados))
+              .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _managementError(response, 'Nao foi possivel salvar o cadastro.');
+    }
+  }
+
+  Future<void> setCadastroAtivo(
+    String tipo, {
+    required int id,
+    required bool ativo,
+  }) async {
+    final uri = Uri.parse(
+      '$writeBaseUrl/api/cadastros/$tipo/$id${ativo ? '/ativo' : ''}',
+    );
+    final headers = ativo
+        ? _headers({'Content-Type': 'application/json'}, true)
+        : _headers(null, true);
+    final response = ativo
+        ? await _client
+              .patch(uri, headers: headers, body: jsonEncode({'ativo': true}))
+              .timeout(const Duration(seconds: 60))
+        : await _client
+              .delete(uri, headers: headers)
+              .timeout(const Duration(seconds: 60));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _managementError(response, 'Nao foi possivel alterar o cadastro.');
+    }
+  }
+
+  ApiException _managementError(http.Response response, String fallback) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiException(
+        '${body['mensagem'] ?? fallback}',
+        response.statusCode,
+      );
+    } on FormatException {
+      return ApiException(
+        'A API retornou o erro ${response.statusCode}.',
+        response.statusCode,
+      );
+    }
+  }
 }
 
 class ApiException implements Exception {

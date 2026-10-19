@@ -68,7 +68,8 @@ namespace InfiniteCoffee2.Data
                 SELECT TOP 1 id_cliente, nome_cliente, email, telefone
                 FROM Clientes
                 WHERE LOWER(LTRIM(RTRIM(nome_cliente))) = LOWER(@nome)
-                  AND LOWER(LTRIM(RTRIM(email))) = LOWER(@email)", conn);
+                  AND LOWER(LTRIM(RTRIM(email))) = LOWER(@email)
+                  AND ativo = 1", conn);
             cmd.Parameters.AddWithValue("@nome", nome.Trim());
             cmd.Parameters.AddWithValue("@email", email.Trim());
             using var reader = cmd.ExecuteReader();
@@ -87,7 +88,7 @@ namespace InfiniteCoffee2.Data
         {
             using var conn = new SqlConnection(connectionString);
             conn.Open();
-            using var cmd = new SqlCommand("SELECT TOP 1 id_cliente, nome_cliente, email, telefone FROM Clientes WHERE id_cliente = @id", conn);
+            using var cmd = new SqlCommand("SELECT TOP 1 id_cliente, nome_cliente, email, telefone FROM Clientes WHERE id_cliente = @id AND ativo = 1", conn);
             cmd.Parameters.AddWithValue("@id", id);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
@@ -133,10 +134,69 @@ namespace InfiniteCoffee2.Data
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                var cmd = new SqlCommand("sp_ExcluirCliente", conn) { CommandType = CommandType.StoredProcedure };
+                var cmd = new SqlCommand("UPDATE Clientes SET ativo = 0 WHERE id_cliente = @id AND ativo = 1", conn);
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.ExecuteNonQuery();
             }
+        }
+
+        public static List<Dictionary<string, object>> ListarClientesCadastro(bool incluirInativos)
+        {
+            var lista = new List<Dictionary<string, object>>();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT id_cliente, nome_cliente, email, ativo
+                FROM Clientes
+                WHERE @incluirInativos = 1 OR ativo = 1
+                ORDER BY nome_cliente", conn);
+            cmd.Parameters.AddWithValue("@incluirInativos", incluirInativos);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["id_cliente"] = reader["id_cliente"],
+                    ["nome_cliente"] = reader["nome_cliente"],
+                    ["email"] = reader["email"] is DBNull ? string.Empty : reader["email"],
+                    ["ativo"] = reader["ativo"]
+                });
+            return lista;
+        }
+
+        public static int CadastrarClienteCadastro(string nome, string email)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO Clientes (nome_cliente, email, telefone, ativo)
+                OUTPUT INSERTED.id_cliente
+                VALUES (@nome, @email, '', 1)", conn);
+            cmd.Parameters.AddWithValue("@nome", nome);
+            cmd.Parameters.AddWithValue("@email", string.IsNullOrWhiteSpace(email) ? DBNull.Value : email);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public static bool AtualizarClienteCadastro(int id, string nome, string email)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE Clientes SET nome_cliente = @nome, email = @email
+                WHERE id_cliente = @id AND ativo = 1", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@nome", nome);
+            cmd.Parameters.AddWithValue("@email", string.IsNullOrWhiteSpace(email) ? DBNull.Value : email);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+
+        public static bool DefinirClienteAtivo(int id, bool ativo)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("UPDATE Clientes SET ativo = @ativo WHERE id_cliente = @id AND ativo <> @ativo", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@ativo", ativo);
+            return cmd.ExecuteNonQuery() > 0;
         }
 
         // =========================
@@ -691,6 +751,173 @@ namespace InfiniteCoffee2.Data
             return lista;
         }
 
+        public static List<Dictionary<string, object>> ListarMesasCadastro(bool incluirInativas)
+        {
+            var lista = new List<Dictionary<string, object>>();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT id_mesa, numero, capacidade, status_mesa, ativo
+                FROM Mesas
+                WHERE @incluirInativas = 1 OR ativo = 1
+                ORDER BY numero, id_mesa", conn);
+            cmd.Parameters.AddWithValue("@incluirInativas", incluirInativas);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["id_mesa"] = reader["id_mesa"],
+                    ["numero"] = reader["numero"],
+                    ["capacidade"] = reader["capacidade"],
+                    ["status_mesa"] = reader["status_mesa"],
+                    ["ativo"] = reader["ativo"]
+                });
+            return lista;
+        }
+
+        public static int CadastrarMesaCadastro(int numero, int capacidade)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                VerificarNumeroMesaDisponivel(conn, transaction, numero, null);
+                using var cmd = new SqlCommand(@"
+                    INSERT INTO Mesas (numero, capacidade, status_mesa, ativo)
+                    OUTPUT INSERTED.id_mesa
+                    VALUES (@numero, @capacidade, 'Disponivel', 1)", conn, transaction);
+                cmd.Parameters.AddWithValue("@numero", numero);
+                cmd.Parameters.AddWithValue("@capacidade", capacidade);
+                var id = Convert.ToInt32(cmd.ExecuteScalar());
+                transaction.Commit();
+                return id;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
+        public static bool AtualizarMesaCadastro(int id, int numero, int capacidade)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                using (var mesaAtiva = new SqlCommand(
+                    "SELECT COUNT(1) FROM Mesas WITH (UPDLOCK, HOLDLOCK) WHERE id_mesa = @id AND ativo = 1",
+                    conn, transaction))
+                {
+                    mesaAtiva.Parameters.AddWithValue("@id", id);
+                    if (Convert.ToInt32(mesaAtiva.ExecuteScalar()) == 0)
+                    {
+                        transaction.Rollback();
+                        return false;
+                    }
+                }
+
+                VerificarNumeroMesaDisponivel(conn, transaction, numero, id);
+                using var cmd = new SqlCommand(@"
+                    UPDATE Mesas SET numero = @numero, capacidade = @capacidade
+                    WHERE id_mesa = @id AND ativo = 1", conn, transaction);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@numero", numero);
+                cmd.Parameters.AddWithValue("@capacidade", capacidade);
+                var atualizado = cmd.ExecuteNonQuery() > 0;
+                transaction.Commit();
+                return atualizado;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
+        private static void VerificarNumeroMesaDisponivel(SqlConnection conn, SqlTransaction transaction, int numero, int? id)
+        {
+            using var cmd = new SqlCommand(@"
+                SELECT COUNT(1) FROM Mesas WITH (UPDLOCK, HOLDLOCK)
+                WHERE numero = @numero AND ativo = 1
+                  AND (@id = 0 OR id_mesa <> @id)", conn, transaction);
+            cmd.Parameters.AddWithValue("@numero", numero);
+            cmd.Parameters.AddWithValue("@id", id.GetValueOrDefault());
+            if (Convert.ToInt32(cmd.ExecuteScalar()) > 0)
+                throw new MesaNumeroDuplicadoException();
+        }
+
+        public static bool DefinirMesaAtiva(int id, bool ativo)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction(IsolationLevel.Serializable);
+            try
+            {
+                int numeroMesa;
+                string statusMesa;
+                using (var mesa = new SqlCommand(
+                    "SELECT numero, status_mesa FROM Mesas WITH (UPDLOCK, HOLDLOCK) WHERE id_mesa = @id",
+                    conn, transaction))
+                {
+                    mesa.Parameters.AddWithValue("@id", id);
+                    using (var reader = mesa.ExecuteReader())
+                    {
+                        if (!reader.Read())
+                        {
+                            transaction.Rollback();
+                            return false;
+                        }
+
+                        numeroMesa = Convert.ToInt32(reader["numero"]);
+                        statusMesa = reader["status_mesa"].ToString() ?? string.Empty;
+                    }
+
+                    if (ativo)
+                        VerificarNumeroMesaDisponivel(conn, transaction, numeroMesa, id);
+                }
+
+                if (!ativo &&
+                    (string.Equals(statusMesa, "Ocupada", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(statusMesa, "Reservada", StringComparison.OrdinalIgnoreCase)))
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+
+                if (!ativo)
+                {
+                    using var pedidosAbertos = new SqlCommand(@"
+                        SELECT COUNT(1) FROM Pedidos WITH (UPDLOCK, HOLDLOCK)
+                        WHERE mesaid = @id AND status_pedido = 'Aberto'", conn, transaction);
+                    pedidosAbertos.Parameters.AddWithValue("@id", id);
+                    if (Convert.ToInt32(pedidosAbertos.ExecuteScalar()) > 0)
+                    {
+                        transaction.Rollback();
+                        return false;
+                    }
+                }
+
+                using var cmd = new SqlCommand(@"
+                    UPDATE Mesas
+                    SET ativo = @ativo,
+                        status_mesa = CASE WHEN @ativo = 1 AND ativo = 0 THEN 'Disponivel' ELSE status_mesa END
+                    WHERE id_mesa = @id AND ativo <> @ativo", conn, transaction);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@ativo", ativo);
+                var alterado = cmd.ExecuteNonQuery() > 0;
+                transaction.Commit();
+                return alterado;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
         public static void AtualizarStatusMesa(int id, string status)
         {
             using (var conn = new SqlConnection(connectionString))
@@ -1203,6 +1430,65 @@ namespace InfiniteCoffee2.Data
             return lista;
         }
 
+        public static List<Dictionary<string, object>> ListarFuncionariosCadastro(bool incluirInativos)
+        {
+            var lista = new List<Dictionary<string, object>>();
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                SELECT id_funcionario, nome_funcionario, cargo, ativo
+                FROM Funcionarios
+                WHERE @incluirInativos = 1 OR ativo = 1
+                ORDER BY nome_funcionario", conn);
+            cmd.Parameters.AddWithValue("@incluirInativos", incluirInativos);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(new Dictionary<string, object>
+                {
+                    ["id_funcionario"] = reader["id_funcionario"],
+                    ["nome_funcionario"] = reader["nome_funcionario"],
+                    ["cargo"] = reader["cargo"],
+                    ["ativo"] = reader["ativo"]
+                });
+            return lista;
+        }
+
+        public static int CadastrarFuncionarioCadastro(string nome, string cargo)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                INSERT INTO Funcionarios (nome_funcionario, cargo, ativo)
+                OUTPUT INSERTED.id_funcionario
+                VALUES (@nome, @cargo, 1)", conn);
+            cmd.Parameters.AddWithValue("@nome", nome);
+            cmd.Parameters.AddWithValue("@cargo", cargo);
+            return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public static bool AtualizarFuncionarioCadastro(int id, string nome, string cargo)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand(@"
+                UPDATE Funcionarios SET nome_funcionario = @nome, cargo = @cargo
+                WHERE id_funcionario = @id AND ativo = 1", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@nome", nome);
+            cmd.Parameters.AddWithValue("@cargo", cargo);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+
+        public static bool DefinirFuncionarioAtivo(int id, bool ativo)
+        {
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new SqlCommand("UPDATE Funcionarios SET ativo = @ativo WHERE id_funcionario = @id AND ativo <> @ativo", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@ativo", ativo);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+
         // =========================
         // RELATÓRIOS
         // =========================
@@ -1271,6 +1557,14 @@ namespace InfiniteCoffee2.Data
                 var cmd = new SqlCommand("sp_Faturamento", conn) { CommandType = CommandType.StoredProcedure };
                 return Convert.ToDecimal(cmd.ExecuteScalar());
             }
+        }
+    }
+
+    public sealed class MesaNumeroDuplicadoException : Exception
+    {
+        public MesaNumeroDuplicadoException()
+            : base("Já existe uma mesa ativa com esse número.")
+        {
         }
     }
 }
