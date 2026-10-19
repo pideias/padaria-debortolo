@@ -52,6 +52,8 @@ Arquivos Flutter principais:
 - `lib/screens/home_screen.dart`: navegação, estoque, produtos, PDV e histórico.
 - `lib/screens/sales_report_screen.dart`: gráfico de vendas agregadas por produto.
 - `lib/screens/management_screen.dart`: cadastros online de clientes, funcionários e mesas.
+- `lib/screens/addam_chat_screen.dart`: conversa em memória com o assistente experimental Addam.
+- `AddamPython/addam_service.py`: respostas locais por regras, sem LLM ou provedor externo.
 
 ## Contratos REST
 
@@ -91,6 +93,17 @@ Arquivos Flutter principais:
 - Esses cadastros dependem de rede/API e não entram na fila offline de estoque/vendas.
 - Antes de publicar esse contrato, aplique `DatabaseScripts/UpgradeEntityManagement.sql` uma vez
   (script idempotente) no banco; ele adiciona as flags `ativo` e atualiza procedures de listagem.
+
+### Addam
+
+- `POST /api/addam/chat` recebe `{ "mensagem": "..." }` (máximo de 500 caracteres) e encaminha para
+  `AddamPython` em `127.0.0.1:8091`; há limite global de 30 mensagens/minuto e o serviço só escuta em loopback.
+- A primeira versão usa regras Python, não é LLM: orienta sobre navegação/funcionalidades, não consulta
+  o banco, não grava pedidos/estoque/cadastros e não gera PDFs. A conversa fica apenas na memória do app.
+- Não expor a porta 8091 nem enviar dados ou credenciais do dono ao serviço. A instalação da unidade
+  `padaria-addam.service` está em `AddamPython/README.md`.
+- Qualquer ação futura deverá ser um comando limitado no backend, com autenticação do dono, confirmação,
+  validação transacional e HTTPS; nunca executar SQL ou comandos arbitrários gerados pelo chat.
 
 ### Sincronizacao
 

@@ -1,5 +1,6 @@
 using InfiniteCoffee2.Data;
 using InfiniteCoffee2.Middleware;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace InfiniteCoffee2
 {
@@ -14,6 +15,21 @@ namespace InfiniteCoffee2
                 builder.Configuration.GetConnectionString("DefaultConnection"));
 
             builder.Services.AddControllersWithViews();
+            builder.Services.AddHttpClient("AddamPython", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(5);
+            });
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.AddFixedWindowLimiter("AddamChat", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 30;
+                    limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                    limiterOptions.AutoReplenishment = true;
+                });
+            });
             builder.Services.AddCors(options =>
             {
                 // O trabalho demonstrativo usa a API a partir do web, desktop e mobile.
@@ -59,6 +75,7 @@ namespace InfiniteCoffee2
                 app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseRateLimiter();
             app.UseMiddleware<ApiKeyMiddleware>();
             app.UseCors("FlutterDevelopment");
 

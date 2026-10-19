@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/product.dart';
 import '../repositories/inventory_repository.dart';
+import 'addam_chat_screen.dart';
 import 'management_screen.dart';
 import '../utils/product_search.dart';
 import 'sales_report_screen.dart';
@@ -62,7 +63,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final desktop = MediaQuery.sizeOf(context).width >= 900;
-    final content = _selectedIndex == 6
+    final content = _selectedIndex == 7
+        ? AddamChatScreen(api: widget.repository.api)
+        : _selectedIndex == 6
         ? ManagementScreen(api: widget.repository.api)
         : FutureBuilder<InventorySnapshot>(
             future: _stock,
@@ -136,6 +139,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               icon: const Icon(Icons.manage_accounts_outlined),
+            ),
+          if (!desktop)
+            IconButton(
+              tooltip: 'Conversar com Addam',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Addam')),
+                    body: AddamChatScreen(api: widget.repository.api),
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.smart_toy_outlined),
             ),
           if (desktop)
             const Padding(
@@ -609,6 +625,11 @@ class _DesktopNavigation extends StatelessWidget {
                   icon: Icon(Icons.manage_accounts_outlined),
                   selectedIcon: Icon(Icons.manage_accounts),
                   label: Text('Cadastros'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.smart_toy_outlined),
+                  selectedIcon: Icon(Icons.smart_toy),
+                  label: Text('Addam'),
                 ),
               ],
             ),

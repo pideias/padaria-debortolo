@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
+import '../models/addam_reply.dart';
 import '../models/product.dart';
 import '../models/sales_by_product.dart';
 
@@ -196,6 +197,27 @@ class InventoryApi {
         .map((item) => SalesByProduct.fromJson(item as Map<String, dynamic>))
         .where((item) => item.quantitySold > 0)
         .toList();
+  }
+
+  Future<AddamReply> chatWithAddam(String message) async {
+    final response = await _client
+        .post(
+          Uri.parse('$writeBaseUrl/api/addam/chat'),
+          headers: _headers({'Content-Type': 'application/json'}, true),
+          body: jsonEncode({'mensagem': message}),
+        )
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) {
+      throw _managementError(response, 'O Addam não conseguiu responder.');
+    }
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return AddamReply.fromJson(data);
+    } on FormatException {
+      throw ApiException('A resposta do Addam veio em um formato inválido.');
+    } on TypeError {
+      throw ApiException('A resposta do Addam veio em um formato inválido.');
+    }
   }
 
   Future<void> updateProduct({

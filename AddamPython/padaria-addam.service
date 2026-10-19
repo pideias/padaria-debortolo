@@ -1,0 +1,22 @@
+[Unit]
+Description=Padaria Debortolo Addam local assistant
+After=network.target
+
+[Service]
+Type=simple
+User=padaria-addam
+Group=padaria-addam
+WorkingDirectory=/opt/padaria-addam
+Environment=PYTHONUNBUFFERED=1
+Environment=ADDAM_PORT=8091
+ExecStart=/usr/bin/python3 /opt/padaria-addam/addam_service.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
