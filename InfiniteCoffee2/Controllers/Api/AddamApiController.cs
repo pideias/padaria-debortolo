@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -46,10 +46,9 @@ public sealed class AddamApiController : ControllerBase
         var endpoint = new Uri(serviceBase, "/chat");
         try
         {
-            using var response = await client.PostAsJsonAsync(
-                endpoint,
-                new { message = request.Mensagem.Trim() },
-                cancellationToken);
+            var requestJson = JsonSerializer.Serialize(new { message = request.Mensagem.Trim() });
+            using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+            using var response = await client.PostAsync(endpoint, content, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new
