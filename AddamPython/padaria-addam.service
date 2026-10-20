@@ -1,6 +1,7 @@
 [Unit]
 Description=Padaria Debortolo Addam local assistant
-After=network.target
+After=network.target ollama.service
+Requires=ollama.service
 
 [Service]
 Type=simple
@@ -9,6 +10,8 @@ Group=padaria-addam
 WorkingDirectory=/opt/padaria-addam
 Environment=PYTHONUNBUFFERED=1
 Environment=ADDAM_PORT=8091
+Environment=ADDAM_MODEL=qwen2.5:0.5b
+Environment=OLLAMA_BASE_URL=http://127.0.0.1:11434
 ExecStart=/usr/bin/python3 /opt/padaria-addam/addam_service.py
 Restart=on-failure
 RestartSec=3

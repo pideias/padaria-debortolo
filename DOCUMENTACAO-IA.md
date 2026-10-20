@@ -52,8 +52,8 @@ Arquivos Flutter principais:
 - `lib/screens/home_screen.dart`: navegação, estoque, produtos, PDV e histórico.
 - `lib/screens/sales_report_screen.dart`: gráfico de vendas agregadas por produto.
 - `lib/screens/management_screen.dart`: cadastros online de clientes, funcionários e mesas.
-- `lib/screens/addam_chat_screen.dart`: conversa em memória com o assistente experimental Addam.
-- `AddamPython/addam_service.py`: respostas locais por regras, sem LLM ou provedor externo.
+- `lib/screens/addam_chat_screen.dart`: conversa em memória com o assistente Addam.
+- `AddamPython/addam_service.py`: conversa local com Qwen2.5-0.5B via Ollama, sem API de LLM externa.
 
 ## Contratos REST
 
@@ -98,12 +98,15 @@ Arquivos Flutter principais:
 
 - `POST /api/addam/chat` recebe `{ "mensagem": "..." }` (máximo de 500 caracteres) e encaminha para
   `AddamPython` em `127.0.0.1:8091`; há limite global de 30 mensagens/minuto e o serviço só escuta em loopback.
-- A primeira versão usa regras Python, não é LLM: orienta sobre navegação/funcionalidades, não consulta
-  o banco, não grava pedidos/estoque/cadastros e não gera PDFs. A conversa fica apenas na memória do app.
-- Não expor a porta 8091 nem enviar dados ou credenciais do dono ao serviço. A instalação da unidade
-  `padaria-addam.service` está em `AddamPython/README.md`.
-- Qualquer ação futura deverá ser um comando limitado no backend, com autenticação do dono, confirmação,
-  validação transacional e HTTPS; nunca executar SQL ou comandos arbitrários gerados pelo chat.
+- O modelo local pode propor cadastros, produtos, vendas e movimentações de estoque em um formato limitado.
+  O app mostra os campos e exige confirmação antes de chamar as APIs REST existentes; Python e Ollama não
+  acessam SQL nem executam SQL.
+- O catálogo ativo é passado como contexto para resolver produtos. O Qwen é pequeno e pode interpretar
+  comandos ambíguos incorretamente; o backend/API valida os dados. Esta versão não gera PDFs nem consulta
+  saídas de estoque por semana/mês.
+- Não exponha as portas 8091 nem 11434. A API de demonstração continua pública em HTTP e as gravações usam
+  os endpoints públicos existentes; use somente dados de teste até adicionar autenticação e HTTPS.
+- A instalação de Ollama/modelo e da unidade `padaria-addam.service` está em `AddamPython/README.md`.
 
 ### Sincronizacao
 

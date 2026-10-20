@@ -199,14 +199,22 @@ class InventoryApi {
         .toList();
   }
 
-  Future<AddamReply> chatWithAddam(String message) async {
+  Future<AddamReply> chatWithAddam(
+    String message, {
+    List<Map<String, String>> history = const [],
+    List<Map<String, dynamic>> catalog = const [],
+  }) async {
     final response = await _client
         .post(
           Uri.parse('$writeBaseUrl/api/addam/chat'),
           headers: _headers({'Content-Type': 'application/json'}, true),
-          body: jsonEncode({'mensagem': message}),
+          body: jsonEncode({
+            'mensagem': message,
+            'historico': history,
+            'catalogo': catalog,
+          }),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 60));
     if (response.statusCode != 200) {
       throw _managementError(response, 'O Addam não conseguiu responder.');
     }
@@ -217,6 +225,124 @@ class InventoryApi {
       throw ApiException('A resposta do Addam veio em um formato inválido.');
     } on TypeError {
       throw ApiException('A resposta do Addam veio em um formato inválido.');
+    }
+  }
+
+  Future<String> executeAddamAction(AddamActionDraft action) async {
+    final fields = action.fields;
+    String text(String key) => fields[key]?.toString().trim() ?? '';
+    int integer(String key) => int.tryParse('${fields[key]}') ?? 0;
+    double decimal(String key) => double.tryParse('${fields[key]}') ?? 0;
+
+    switch (action.type) {
+      case 'create_customer':
+        await saveCadastro(
+          'clientes',
+          dados: {'nome': text('nome'), 'email': text('email')},
+        );
+        return 'Cliente cadastrado pela API.';
+      case 'update_customer':
+        await saveCadastro(
+          'clientes',
+          id: integer('id_cliente'),
+          dados: {'nome': text('nome'), 'email': text('email')},
+        );
+        return 'Cliente atualizado pela API.';
+      case 'create_product':
+        await createProduct(
+          name: text('nome'),
+          description: text('descricao'),
+          barcode: text('codigoBarras'),
+          type: text('tipo'),
+          price: decimal('preco'),
+          quantity: integer('quantidade'),
+          stockReason: text('motivoEstoqueInicial').isEmpty
+              ? 'Estoque inicial via Addam'
+              : text('motivoEstoqueInicial'),
+        );
+        return 'Produto cadastrado e estoque inicial enviado à API.';
+      case 'stock_entry':
+        await registerEntry(
+          productId: integer('produtoId'),
+          quantity: integer('quantidade'),
+          reason: text('motivo'),
+        );
+        return 'Entrada de estoque registrada pela API.';
+      case 'stock_exit':
+        await registerExit(
+          productId: integer('produtoId'),
+          quantity: integer('quantidade'),
+          reason: text('motivo'),
+        );
+        return 'Saída de estoque registrada pela API.';
+      case 'update_product':
+        await updateProduct(
+          productId: integer('id_produto'),
+          name: text('nome'),
+          description: text('descricao'),
+          barcode: text('codigoBarras'),
+          type: text('tipo'),
+          price: decimal('preco'),
+        );
+        return 'Produto atualizado pela API.';
+      case 'create_employee':
+        await saveCadastro(
+          'funcionarios',
+          dados: {'nome': text('nome'), 'cargo': text('cargo')},
+        );
+        return 'Funcionário cadastrado pela API.';
+      case 'update_employee':
+        await saveCadastro(
+          'funcionarios',
+          id: integer('id_funcionario'),
+          dados: {'nome': text('nome'), 'cargo': text('cargo')},
+        );
+        return 'Funcionário atualizado pela API.';
+      case 'create_table':
+        await saveCadastro(
+          'mesas',
+          dados: {
+            'numero': integer('numero'),
+            'capacidade': integer('capacidade'),
+          },
+        );
+        return 'Mesa cadastrada pela API.';
+      case 'update_table':
+        await saveCadastro(
+          'mesas',
+          id: integer('id_mesa'),
+          dados: {
+            'numero': integer('numero'),
+            'capacidade': integer('capacidade'),
+          },
+        );
+        return 'Mesa atualizada pela API.';
+      case 'create_sale':
+        final rawItems = fields['itens'];
+        if (rawItems is! List || rawItems.isEmpty) {
+          throw const ApiException(
+            'A proposta da venda não tem itens válidos.',
+          );
+        }
+        final items = rawItems
+            .whereType<Map>()
+            .map(
+              (item) => {
+                'produtoId': int.tryParse('${item['produtoId']}') ?? 0,
+                'quantidade': int.tryParse('${item['quantidade']}') ?? 0,
+              },
+            )
+            .toList();
+        await createSale(
+          customer: text('clienteNome'),
+          payment: text('formaPagamento'),
+          items: items,
+        );
+        return 'Venda enviada para validação e gravação pela API.';
+      default:
+        throw const ApiException(
+          'Essa ação do Addam ainda não está disponível.',
+        );
     }
   }
 
@@ -287,6 +413,7 @@ class InventoryApi {
     required String type,
     required double price,
     required int quantity,
+    String stockReason = 'Estoque inicial do produto',
   }) async {
     final response = await _client
         .post(
@@ -299,6 +426,7 @@ class InventoryApi {
             'tipo': type,
             'preco': price,
             'quantidade': quantity,
+            'motivoEstoqueInicial': stockReason,
           }),
         )
         .timeout(const Duration(seconds: 60));

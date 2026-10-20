@@ -14,8 +14,16 @@ O endpoint `POST /api/addam/chat` encaminha mensagens para um serviço Python lo
 `http://127.0.0.1:8091`. A API devolve `503` se esse serviço não estiver instalado ou ativo. O
 workflow atual não instala nem atualiza esse sidecar; faça isso separadamente na VM:
 
-1. Pelo PowerShell, copie `AddamPython/addam_service.py` e `AddamPython/padaria-addam.service` para `/tmp/` na VM via SCP.
-2. Na VM, crie o usuário de serviço e instale os arquivos:
+1. Na VM, instale Ollama e baixe o modelo local Qwen2.5 0.5B (Q4_K_M, cerca de 398 MB):
+
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   systemctl enable --now ollama
+   ollama pull qwen2.5:0.5b
+   ```
+
+2. Pelo PowerShell, copie `AddamPython/addam_service.py` e `AddamPython/padaria-addam.service` para `/tmp/` na VM via SCP.
+3. Na VM, crie o usuário de serviço e instale os arquivos:
 
    ```bash
    id -u padaria-addam >/dev/null 2>&1 || useradd --system --user-group --home-dir /nonexistent --shell /usr/sbin/nologin padaria-addam
@@ -27,11 +35,12 @@ workflow atual não instala nem atualiza esse sidecar; faça isso separadamente 
    curl -fsS http://127.0.0.1:8091/health
    ```
 
-3. Confirme `{"status":"ok","assistant":"Addam","mode":"rules"}` e então publique/reinicie a API ASP.NET.
+4. Confirme `{"status":"ok","assistant":"Addam","model":"qwen2.5:0.5b"}` e então publique/reinicie a API ASP.NET.
 
-O serviço usa apenas a biblioteca padrão do Python, escuta em loopback e não deve ter a porta `8091`
-aberta no firewall. Esta versão só responde por regras de texto; não consulta nem altera o banco, não
-faz pedidos e não gera PDFs. Não use respostas do chat como autorização para ações administrativas.
+O serviço Python usa apenas a biblioteca padrão, chama Ollama em loopback e não deve ter as portas
+`8091` nem `11434` abertas no firewall. O Qwen local propõe ações estruturadas; o APK mostra uma prévia
+e, após confirmação, chama os endpoints REST existentes. O modelo não acessa SQL nem executa comandos.
+O API demo continua público/HTTP: use somente dados de teste, pois a confirmação no APK não é autenticação.
 
 ## Configuração no GitHub
 

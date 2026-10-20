@@ -228,20 +228,53 @@ namespace InfiniteCoffee2.Data
             return lista;
         }
 
-        public static void CadastrarProduto(string nome, decimal preco, string tipo, int quantidade, string codigoBarras, string descricao)
+        public static void CadastrarProduto(
+            string nome,
+            decimal preco,
+            string tipo,
+            int quantidade,
+            string codigoBarras,
+            string descricao,
+            string motivoEstoqueInicial = "Estoque inicial do produto")
         {
             GarantirEstruturaEstoque();
-            using (var conn = new SqlConnection(connectionString))
+            using var conn = new SqlConnection(connectionString);
+            conn.Open();
+            using var transaction = conn.BeginTransaction();
+            try
             {
-                conn.Open();
-                var cmd = new SqlCommand("INSERT INTO Produtos (nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao) VALUES (@nome, @preco, @tipo, @quantidade, @codigoBarras, @descricao)", conn);
+                using var cmd = new SqlCommand(@"
+                    INSERT INTO Produtos (nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao)
+                    OUTPUT INSERTED.id_produto
+                    VALUES (@nome, @preco, @tipo, @quantidade, @codigoBarras, @descricao)", conn, transaction);
                 cmd.Parameters.AddWithValue("@nome", nome);
                 cmd.Parameters.AddWithValue("@preco", preco);
                 cmd.Parameters.AddWithValue("@tipo", tipo);
                 cmd.Parameters.AddWithValue("@quantidade", quantidade);
                 cmd.Parameters.AddWithValue("@codigoBarras", string.IsNullOrWhiteSpace(codigoBarras) ? DBNull.Value : codigoBarras.Trim());
                 cmd.Parameters.AddWithValue("@descricao", string.IsNullOrWhiteSpace(descricao) ? DBNull.Value : descricao.Trim());
-                cmd.ExecuteNonQuery();
+                var produtoId = Convert.ToInt32(cmd.ExecuteScalar());
+
+                if (quantidade > 0)
+                {
+                    using var movimentacao = new SqlCommand(@"
+                        INSERT INTO MovimentacoesEstoque
+                            (produtoid, tipo_movimentacao, quantidade, motivo, data_movimentacao)
+                        VALUES (@produtoId, 'Entrada', @quantidade, @motivo, GETDATE())", conn, transaction);
+                    movimentacao.Parameters.AddWithValue("@produtoId", produtoId);
+                    movimentacao.Parameters.AddWithValue("@quantidade", quantidade);
+                    movimentacao.Parameters.AddWithValue("@motivo", string.IsNullOrWhiteSpace(motivoEstoqueInicial)
+                        ? "Estoque inicial do produto"
+                        : motivoEstoqueInicial.Trim());
+                    movimentacao.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
             }
         }
 

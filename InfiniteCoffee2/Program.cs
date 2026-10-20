@@ -17,7 +17,7 @@ namespace InfiniteCoffee2
             builder.Services.AddControllersWithViews();
             builder.Services.AddHttpClient("AddamPython", client =>
             {
-                client.Timeout = TimeSpan.FromSeconds(5);
+                client.Timeout = TimeSpan.FromSeconds(55);
             });
             builder.Services.AddRateLimiter(options =>
             {
