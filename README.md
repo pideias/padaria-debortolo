@@ -10,8 +10,8 @@ O SQL Server é a fonte oficial. O aplicativo Flutter usa `shared_preferences` p
 catálogo em cache e uma fila local de operações offline. Windows, Android e Web usam o mesmo
 código Flutter e conversam com o servidor pela API REST.
 
-O Addam inicial é um assistente Python local baseado em regras, sem LLM/provedor externo e sem
-acesso ao banco. Para executar a conversa, mantenha o serviço Python de loopback iniciado; veja
+O Addam usa o Qwen2.5-0.5B local pelo Ollama, sem API de LLM externa e sem acesso SQL direto. Para
+executar a conversa, mantenha Ollama e o serviço Python de loopback iniciados; veja
 [`AddamPython/README.md`](AddamPython/README.md) e [`DEPLOY-HOSTINGER.md`](DEPLOY-HOSTINGER.md).
 
 Para o codigo funcionar precisa criar e conectar o banco de dados primeiro, a seguir estão os comandos do banco de dados;

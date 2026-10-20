@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:convert';
+
 import '../models/addam_reply.dart';
 import '../services/inventory_api.dart';
 
@@ -16,9 +18,9 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
   static const _welcome = AddamReply(
     assistant: 'Addam',
     text:
-        'Olá! Sou o Addam, assistente de teste da Padaria Debortolo. '
-        'Nesta versão posso orientar você pelo aplicativo. Ainda não consulto '
-        'nem altero dados, não crio pedidos e não gero PDFs.',
+        'Olá! Sou o Addam, assistente da Padaria Debortolo. Posso conversar sobre '
+        'estoque e preparar cadastros, vendas e movimentações. Antes de gravar, '
+        'vou mostrar uma proposta para você revisar e confirmar.',
     suggestions: [
       'O que você consegue fazer?',
       'Como consulto o estoque?',
@@ -32,8 +34,11 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
   final List<_AddamMessage> _messages = [
     _AddamMessage(text: _welcome.text, fromAddam: true),
   ];
+  List<Map<String, dynamic>> _catalog = const [];
+  DateTime? _catalogLoadedAt;
   List<String> _suggestions = _welcome.suggestions;
   bool _sending = false;
+  bool _executingAction = false;
 
   @override
   void dispose() {
@@ -43,9 +48,25 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
   }
 
   Future<void> _send([String? suggestedMessage]) async {
-    if (_sending) return;
+    if (_sending || _executingAction) return;
     final message = (suggestedMessage ?? _inputController.text).trim();
     if (message.isEmpty) return;
+
+    final priorMessages = _messages.skip(1).toList();
+    final recentMessages = priorMessages.length > 6
+        ? priorMessages.sublist(priorMessages.length - 6)
+        : priorMessages;
+    final history = recentMessages
+        .map(
+          (item) => <String, String>{
+            'role': item.fromAddam ? 'assistant' : 'user',
+            'content': item.action == null
+                ? item.text
+                : '${item.text}\nProposta estruturada anterior: '
+                      '${jsonEncode({'type': item.action!.type, 'fields': item.action!.fields})}',
+          },
+        )
+        .toList(growable: false);
 
     _inputController.clear();
     setState(() {
@@ -56,10 +77,21 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
     _scrollToBottom();
 
     try {
-      final answer = await widget.api.chatWithAddam(message);
+      final catalog = await _carregarCatalogo();
+      final answer = await widget.api.chatWithAddam(
+        message,
+        history: history,
+        catalog: catalog,
+      );
       if (!mounted) return;
       setState(() {
-        _messages.add(_AddamMessage(text: answer.text, fromAddam: true));
+        _messages.add(
+          _AddamMessage(
+            text: answer.text,
+            fromAddam: true,
+            action: answer.action,
+          ),
+        );
         _suggestions = answer.suggestions;
         _sending = false;
       });
@@ -80,6 +112,141 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
       });
     }
     _scrollToBottom();
+  }
+
+  Future<List<Map<String, dynamic>>> _carregarCatalogo() async {
+    final loadedAt = _catalogLoadedAt;
+    if (loadedAt != null &&
+        DateTime.now().difference(loadedAt) < const Duration(seconds: 30)) {
+      return _catalog;
+    }
+
+    try {
+      final products = await widget.api.getStock();
+      final catalog = products
+          .take(20)
+          .map(
+            (product) => <String, dynamic>{
+              'id': product.id,
+              'nome': product.name,
+              'tipo': product.type,
+              'quantidade': product.quantity,
+              'preco': product.price,
+              'descricao': product.description ?? '',
+              'codigoBarras': product.barcode ?? '',
+            },
+          )
+          .toList(growable: false);
+      if (mounted) {
+        _catalog = catalog;
+        _catalogLoadedAt = DateTime.now();
+      }
+      return catalog;
+    } catch (_) {
+      return _catalog;
+    }
+  }
+
+  Future<void> _confirmAction(_AddamMessage message) async {
+    final action = message.action;
+    if (action == null || _executingAction || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_tituloAcao(action.type)),
+        content: Text(_resumoAcao(action)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Revisar depois'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmar e gravar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _executingAction = true);
+    try {
+      final result = await widget.api.executeAddamAction(action);
+      if (!mounted) return;
+      setState(() {
+        message.action = null;
+        _messages.add(_AddamMessage(text: result, fromAddam: true));
+        _suggestions = const [
+          'O que você consegue fazer?',
+          'Como consulto o estoque?',
+        ];
+        _executingAction = false;
+        _catalogLoadedAt = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          _AddamMessage(
+            text: error is ApiException ? error.message : 'A API não concluiu a ação. Confira os dados e tente novamente.',
+            fromAddam: true,
+          ),
+        );
+        _executingAction = false;
+      });
+    }
+    _scrollToBottom();
+  }
+
+  String _tituloAcao(String type) => switch (type) {
+    'create_customer' => 'Cadastrar cliente',
+    'update_customer' => 'Atualizar cliente',
+    'create_product' => 'Cadastrar produto',
+    'update_product' => 'Atualizar produto',
+    'stock_entry' => 'Registrar entrada de estoque',
+    'stock_exit' => 'Registrar saída de estoque',
+    'create_employee' => 'Cadastrar funcionário',
+    'update_employee' => 'Atualizar funcionário',
+    'create_table' => 'Cadastrar mesa',
+    'update_table' => 'Atualizar mesa',
+    'create_sale' => 'Criar venda',
+    _ => 'Confirmar ação do Addam',
+  };
+
+  String _resumoAcao(AddamActionDraft action) {
+    final fields = action.fields;
+    String value(String key) => fields[key]?.toString() ?? '';
+    switch (action.type) {
+      case 'create_customer':
+        return 'Nome: ${value('nome')}\nE-mail: ${value('email').isEmpty ? 'não informado' : value('email')}';
+      case 'create_product':
+        return 'Produto: ${value('nome')}\nTipo: ${value('tipo')}\nPreço: R\$ ${value('preco')}\nEstoque inicial: ${value('quantidade')} unidades';
+      case 'stock_entry':
+      case 'stock_exit':
+        return 'Produto: ${value('produtoNome').isEmpty ? 'ID ${value('produtoId')}' : value('produtoNome')}\nQuantidade: ${value('quantidade')}\nMotivo: ${value('motivo')}';
+      case 'update_product':
+        return 'Produto ID: ${value('id_produto')}\nNome: ${value('nome')}\nTipo: ${value('tipo')}\nPreço: R\$ ${value('preco')}';
+      case 'create_employee':
+        return 'Nome: ${value('nome')}\nCargo: ${value('cargo')}';
+      case 'create_table':
+        return 'Mesa ${value('numero')}\nCapacidade: ${value('capacidade')} lugares';
+      case 'create_sale':
+        final items = fields['itens'] is List
+            ? (fields['itens'] as List)
+                  .whereType<Map>()
+                  .map(
+                    (item) =>
+                        '${item['produtoNome'] ?? 'Produto ID ${item['produtoId']}'} × ${item['quantidade']}',
+                  )
+                  .join('\n')
+            : 'Nenhum item';
+        return 'Forma de pagamento: ${value('formaPagamento')}\n$items';
+      default:
+        return fields.entries
+            .map((entry) => '${entry.key}: ${entry.value}')
+            .join('\n');
+    }
   }
 
   void _scrollToBottom() {
@@ -111,7 +278,7 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
               ),
               title: const Text('Addam'),
               subtitle: const Text(
-                'Assistente experimental • respostas guiadas',
+                'Qwen local • ações pela API com confirmação',
               ),
             ),
           ),
@@ -125,7 +292,17 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
               if (_sending && index == _messages.length) {
                 return const _TypingIndicator();
               }
-              return _MessageBubble(message: _messages[index]);
+              final message = _messages[index];
+              return _MessageBubble(
+                message: message,
+                onConfirmAction: message.action == null
+                    ? null
+                    : () => _confirmAction(message),
+                onCancelAction: message.action == null
+                    ? null
+                    : () => setState(() => message.action = null),
+                actionBusy: _executingAction,
+              );
             },
           ),
         ),
@@ -193,16 +370,25 @@ class _AddamChatScreenState extends State<AddamChatScreen> {
 }
 
 class _AddamMessage {
-  const _AddamMessage({required this.text, required this.fromAddam});
+  _AddamMessage({required this.text, required this.fromAddam, this.action});
 
   final String text;
   final bool fromAddam;
+  AddamActionDraft? action;
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    required this.onConfirmAction,
+    required this.onCancelAction,
+    required this.actionBusy,
+  });
 
   final _AddamMessage message;
+  final VoidCallback? onConfirmAction;
+  final VoidCallback? onCancelAction;
+  final bool actionBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -224,7 +410,39 @@ class _MessageBubble extends StatelessWidget {
                 ? Border.all(color: const Color(0xFFE9DED3))
                 : null,
           ),
-          child: SelectableText(message.text),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText(message.text),
+              if (message.action case final action?) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Proposta para revisão',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 4),
+                SelectableText(
+                  action.fields.entries
+                      .map((entry) => '${entry.key}: ${entry.value}')
+                      .join('\n'),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: actionBusy ? null : onConfirmAction,
+                      child: const Text('Confirmar'),
+                    ),
+                    TextButton(
+                      onPressed: actionBusy ? null : onCancelAction,
+                      child: const Text('Cancelar'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
