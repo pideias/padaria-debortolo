@@ -214,7 +214,7 @@ class InventoryApi {
             'catalogo': catalog,
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 75));
     if (response.statusCode != 200) {
       throw _managementError(response, 'O Addam não conseguiu responder.');
     }
