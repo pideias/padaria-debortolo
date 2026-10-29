@@ -49,7 +49,8 @@ namespace InfiniteCoffee2
                 });
             });
 
-            // Session é necessária para guardar os dados do atendimento entre as etapas
+            // Session mantém os identificadores do atendimento no cache em memória.
+            builder.Services.AddDistributedMemoryCache();
             builder.Services.AddSession(options =>
             {
                 options.IdleTimeout = TimeSpan.FromMinutes(30);

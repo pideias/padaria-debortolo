@@ -78,14 +78,3 @@
         </div>
     </div>
 </div>
-
-<script>
-    (() => {
-        let navegando = false;
-        document.addEventListener('click', event => { if (event.target.closest('a')) navegando = true; });
-        document.addEventListener('submit', () => { navegando = true; });
-        window.addEventListener('pagehide', () => {
-            if (!navegando && navigator.sendBeacon) navigator.sendBeacon('/Atendimento/Cancelar');
-        });
-    })();
-</script>

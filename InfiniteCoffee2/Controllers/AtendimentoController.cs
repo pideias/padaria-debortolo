@@ -12,7 +12,9 @@ namespace InfiniteCoffee2.Controllers
         // ── ETAPA 1: Escolher ou cadastrar cliente ──────────────────────────
         public IActionResult Index()
         {
-            HttpContext.Session.Clear(); // limpa qualquer atendimento anterior
+            if ((HttpContext.Session.GetInt32("pedidoId") ?? 0) > 0)
+                return RedirectToAction(nameof(AdicionarItens));
+
             ViewBag.Clientes = Banco.ListarClientes();
             return View();
         }
@@ -172,8 +174,8 @@ namespace InfiniteCoffee2.Controllers
         [HttpPost]
         public IActionResult Cancelar()
         {
-            // O beacon executado no pagehide também ocorre ao voltar ou atualizar a página.
-            // Só o formulário explícito de cancelamento deve apagar o pedido em aberto.
+            // Requisições sem formulário, como beacons antigos de pagehide, não cancelam pedidos.
+            // Só o formulário explícito de cancelamento pode apagar o pedido em aberto.
             if (!Request.HasFormContentType)
                 return NoContent();
 
