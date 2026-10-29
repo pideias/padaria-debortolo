@@ -1131,7 +1131,7 @@ namespace InfiniteCoffee2.Data
             out string mensagem)
         {
             var forma = formaPagamento?.Trim() ?? string.Empty;
-            if (forma is not ("Dinheiro" or "Cartão" or "Pix"))
+            if (forma is not ("Dinheiro" or "Cartão" or "Cartão de crédito" or "Cartão de débito" or "Pix"))
             {
                 mensagem = "Selecione uma forma de pagamento válida.";
                 return false;

@@ -27,15 +27,19 @@
         <div class="card p-4">
             <p class="eyebrow mb-1">último passo</p>
             <h3>Forma de pagamento</h3>
-            <p class="text-muted">Esta etapa é uma simulação.</p>
+            <p class="text-muted">Selecione a forma de pagamento registrada para este pedido.</p>
             <form method="post" action="/Atendimento/Finalizar">
                 <div class="form-check p-3 border rounded mb-2">
                     <input class="form-check-input" type="radio" name="forma" value="Dinheiro" id="dinheiro" checked />
                     <label class="form-check-label" for="dinheiro">Dinheiro</label>
                 </div>
                 <div class="form-check p-3 border rounded mb-2">
-                    <input class="form-check-input" type="radio" name="forma" value="Cartão" id="cartao" />
-                    <label class="form-check-label" for="cartao">Cartão</label>
+                    <input class="form-check-input" type="radio" name="forma" value="Cartão de crédito" id="cartaoCredito" />
+                    <label class="form-check-label" for="cartaoCredito">Cartão de crédito</label>
+                </div>
+                <div class="form-check p-3 border rounded mb-2">
+                    <input class="form-check-input" type="radio" name="forma" value="Cartão de débito" id="cartaoDebito" />
+                    <label class="form-check-label" for="cartaoDebito">Cartão de débito</label>
                 </div>
                 <div class="form-check p-3 border rounded mb-4">
                     <input class="form-check-input" type="radio" name="forma" value="Pix" id="pix" />
@@ -47,14 +51,3 @@
         </div>
     </div>
 </div>
-
-<script>
-    (() => {
-        let navegando = false;
-        document.addEventListener('click', event => { if (event.target.closest('a')) navegando = true; });
-        document.addEventListener('submit', () => { navegando = true; });
-        window.addEventListener('pagehide', () => {
-            if (!navegando && navigator.sendBeacon) navigator.sendBeacon('/Atendimento/Cancelar');
-        });
-    })();
-</script>
