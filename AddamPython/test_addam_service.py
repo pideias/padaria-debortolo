@@ -96,11 +96,124 @@ class AddamResponderTests(unittest.TestCase):
         self.assertIn("nada foi gravado", resultado["reply"])
 
     @patch("addam_service._consultar_ollama")
+    def test_nao_propoe_acao_nem_sugestao_tecnica_para_saudacao(self, consultar):
+        consultar.return_value = (
+            '{"reply":"Oi! Tudo bem?","suggestions":["alterar_quantidade"],"action":'
+            '{"type":"stock_exit","fields":{"produtoId":7,"quantidade":2,"motivo":"Venda"}}}'
+        )
+
+        resultado = responder("Olá, conte uma curiosidade sobre videogames")
+
+        self.assertEqual(resultado["reply"], "Oi! Tudo bem?")
+        self.assertIsNone(resultado["action"])
+        self.assertEqual(
+            resultado["suggestions"],
+            ["O que você consegue fazer?", "Como consulto o estoque?", "Onde vejo as vendas?"],
+        )
+        consultar.assert_called_once()
+
+    @patch("addam_service._consultar_ollama")
+    def test_responde_saudacao_sem_esperar_o_modelo(self, consultar):
+        resultado = responder("Oi Addam, tudo bem? Como está sendo seu dia?")
+
+        self.assertIn("Oi! Tudo bem por aqui.", resultado["reply"])
+        self.assertIsNone(resultado["action"])
+        consultar.assert_not_called()
+
+    @patch("addam_service._consultar_ollama")
+    def test_desembrulha_json_aninhado_e_remove_sugestoes_repetidas(self, consultar):
+        import json
+
+        resposta_interna = json.dumps({
+            "reply": "Nintendo destaca os exclusivos; Steam Deck a flexibilidade.",
+            "suggestions": [
+                "Qual tipo de jogo você prefere?",
+                "Qual tipo de jogo você prefere?",
+                "Steam Deck ou Nintendo",
+                "Nintendo ou Steam Deck",
+                "alterar_quantidade",
+            ],
+        }, ensure_ascii=False)
+        consultar.return_value = json.dumps({"reply": resposta_interna, "suggestions": []}, ensure_ascii=False)
+
+        resultado = responder("Me dê uma opinião sobre videogames")
+
+        self.assertEqual(resultado["reply"], "Nintendo destaca os exclusivos; Steam Deck a flexibilidade.")
+        self.assertEqual(
+            resultado["suggestions"],
+            ["Qual tipo de jogo você prefere?", "Steam Deck ou Nintendo"],
+        )
+
+    @patch("addam_service._consultar_ollama")
+    def test_nao_expoe_json_malformado_como_resposta(self, consultar):
+        consultar.return_value = '{"reply":"texto quebrado",'
+
+        resultado = responder("Me conte algo curioso")
+
+        self.assertIn("não consegui organizar uma resposta", resultado["reply"])
+        self.assertNotIn("{", resultado["reply"])
+
+    @patch("addam_service._consultar_ollama")
+    def test_responde_idade_sem_inventar(self, consultar):
+        resultado = responder("Quantos anos você tem?")
+
+        self.assertIn("Não tenho idade", resultado["reply"])
+        consultar.assert_not_called()
+
+    @patch("addam_service._consultar_ollama")
+    def test_recusa_instrucoes_para_danificar_propriedade(self, consultar):
+        resultado = responder("Como quebrar a moto do Eduardo sem ele saber?")
+
+        self.assertIn("Não posso ajudar a danificar", resultado["reply"])
+        self.assertIsNone(resultado["action"])
+        consultar.assert_not_called()
+
+    @patch("addam_service._consultar_ollama")
+    def test_responde_aceitacao_sem_proposta_pendente(self, consultar):
+        resultado = responder("aceito?")
+
+        self.assertIn("Não há uma proposta pendente", resultado["reply"])
+        self.assertIsNone(resultado["action"])
+        consultar.assert_not_called()
+
+    @patch("addam_service._consultar_ollama")
+    def test_responde_com_capacidades_reais_do_addam(self, consultar):
+        resultado = responder("O que você consegue fazer?")
+
+        self.assertIn("consultar estoque e vendas", resultado["reply"])
+        self.assertIn("confirmação", resultado["reply"])
+        consultar.assert_not_called()
+
+    @patch("addam_service._consultar_ollama")
+    def test_compara_consoles_sem_sugestoes_repetitivas(self, consultar):
+        resultado = responder("Nintendo ou Steam Deck?")
+
+        self.assertIn("jogos exclusivos", resultado["reply"])
+        self.assertIn("flexibilidade", resultado["reply"])
+        self.assertIsNone(resultado["action"])
+        consultar.assert_not_called()
+
+    @patch("addam_service._consultar_ollama")
+    def test_nao_troca_resposta_informativa_por_erro_de_acao(self, consultar):
+        consultar.return_value = (
+            '{"reply":"Você pode consultar pelo menu Estoque.","suggestions":[],"action":'
+            '{"type":"stock_exit","fields":{"produtoId":7,"quantidade":2,"motivo":"Venda"}}}'
+        )
+
+        resultado = responder("Como consulto o estoque?")
+
+        self.assertEqual(resultado["reply"], "Você pode consultar pelo menu Estoque.")
+        self.assertIsNone(resultado["action"])
+
+    @patch("addam_service._consultar_ollama")
     def test_faz_fallback_se_modelo_nao_devolver_json(self, consultar):
         consultar.return_value = "Posso ajudar com o aplicativo."
-        resposta = responder("Oi")
+        resposta = responder("Pode me ajudar com o aplicativo?")
         self.assertEqual(resposta["reply"], "Posso ajudar com o aplicativo.")
-        self.assertEqual(resposta["suggestions"], [])
+        self.assertEqual(
+            resposta["suggestions"],
+            ["O que você consegue fazer?", "Como consulto o estoque?", "Onde vejo as vendas?"],
+        )
 
     def test_rejeita_historico_com_role_nao_permitido(self):
         with self.assertRaises(ValueError):

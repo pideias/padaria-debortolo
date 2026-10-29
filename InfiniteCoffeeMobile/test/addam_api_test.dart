@@ -60,6 +60,43 @@ void main() {
     expect(reply.action?.fields['quantidade'], 12);
   });
 
+  test('desembrulha JSON acidental e elimina sugestões repetidas', () {
+    final reply = AddamReply.fromJson({
+      'assistant': 'Addam',
+      'reply': jsonEncode({
+        'reply': 'Nintendo destaca os exclusivos; Steam Deck a flexibilidade.',
+        'suggestions': [
+          'Qual tipo de jogo você prefere?',
+          'Qual tipo de jogo você prefere?',
+          'Steam Deck ou Nintendo',
+          'Nintendo ou Steam Deck',
+          'alterar_quantidade',
+        ],
+      }),
+      'suggestions': [],
+    });
+
+    expect(
+      reply.text,
+      'Nintendo destaca os exclusivos; Steam Deck a flexibilidade.',
+    );
+    expect(reply.suggestions, [
+      'Qual tipo de jogo você prefere?',
+      'Steam Deck ou Nintendo',
+    ]);
+  });
+
+  test('não exibe JSON incompleto como texto da conversa', () {
+    final reply = AddamReply.fromJson({
+      'assistant': 'Addam',
+      'reply': '{"reply":"texto quebrado",',
+      'suggestions': [],
+    });
+
+    expect(reply.text, contains('não consegui organizar uma resposta'));
+    expect(reply.text, isNot(contains('{')));
+  });
+
   test(
     'encaminha a proposta confirmada ao endpoint normal de produtos',
     () async {
