@@ -12,7 +12,7 @@ foi o nome anterior do projeto. Antes de alterar o código, leia este arquivo, `
 - Acesso ao banco: `InfiniteCoffee2/Data/Banco.cs`.
 - API REST e Swagger: `InfiniteCoffee2/Controllers/Api`.
 - Pasta Flutter versionada no repositorio: `InfiniteCoffeeMobile`.
-- Branch oficial para publicacao: `kaio`.
+- Branch oficial para desenvolvimento e publicacao: `CdmEdu`. Alteracoes sao publicadas pelo agente OpenCode somente quando solicitadas pelo responsavel da branch.
 
 ## Ordem de leitura por tarefa
 
