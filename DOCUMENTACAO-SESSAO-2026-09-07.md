@@ -76,17 +76,17 @@ flutter build windows --release `
 Artefatos (pasta `artifacts/` ignorada pelo git):
 
 - `artifacts/installer/Instalar-App-Celular.apk`
-- `artifacts/installer/PadariaDebortolo-Desktop-Setup.exe`
-- `artifacts/installer/Pacote-Completo-Padaria.zip` (pacote para a padaria)
+- `artifacts/installer/InfiniteCoffee-Desktop-Setup.exe`
+- `artifacts/installer/Pacote-Completo-Infinite-Coffee.zip` (pacote de distribuição do sistema)
 
 ## Instalador desktop - variante cloud
 
-Novo arquivo `Installer/PadariaDebortolo-Cloud.iss` (Inno Setup 7), ao
-lado do instalador original (`PadariaDebortolo.iss`, mantido sem
+Novo arquivo `Installer/InfiniteCoffee-Cloud.iss` (Inno Setup 7), ao
+lado do instalador completo (`InfiniteCoffee.iss`, mantido sem
 alteracao):
 
-- Instala somente o app Flutter Windows; nao exige SQL Server nem
-  backend local na maquina da padaria.
+- Instala somente o aplicativo Infinite Coffee para Windows; nao exige SQL Server nem
+  backend local na maquina cliente.
 - Inclui `Installer/LEIA-ME-DESKTOP.txt` com instrucoes de offline.
 - O pipeline original (`Installer/publish.ps1`) continua funcionando para
   o cenario tudo-local.

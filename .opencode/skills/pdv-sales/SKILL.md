@@ -1,6 +1,6 @@
 ---
 name: pdv-sales
-description: Use when working on the Padaria Debortolo PDV, cart, sales, payments, orders, or checkout flow.
+description: Use when working on the Infinite Coffee POS, cart, sales, payments, orders, or checkout flow.
 ---
 
 # PDV e Vendas

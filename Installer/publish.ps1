@@ -35,9 +35,9 @@ if (-not $SkipFlutter) {
     Copy-Item -Path (Join-Path $flutterOutput '*') -Destination $desktopOutput -Recurse -Force
 }
 
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PadariaDebortolo.cmd') -Destination $serverOutput -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PadariaDesktop.cmd') -Destination $artifacts -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PadariaDesktop.ps1') -Destination $artifacts -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-InfiniteCoffeeApi.cmd') -Destination $serverOutput -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-InfiniteCoffeeDesktop.cmd') -Destination $artifacts -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-InfiniteCoffeeDesktop.ps1') -Destination $artifacts -Force
 
 if (-not $SkipInstaller) {
     $isccCandidates = @(
@@ -54,7 +54,7 @@ if (-not $SkipInstaller) {
     }
     else {
         Write-Host 'Compilando instalador Windows...'
-        $issFile = Join-Path $PSScriptRoot 'PadariaDebortolo.iss'
+        $issFile = Join-Path $PSScriptRoot 'InfiniteCoffee.iss'
         $isccPath = @($isccCandidates)[0]
         $process = Start-Process -FilePath $isccPath -ArgumentList "`"$issFile`"" -Wait -PassThru -NoNewWindow
         if ($process.ExitCode -ne 0) {

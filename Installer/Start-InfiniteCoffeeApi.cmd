@@ -10,7 +10,7 @@ if not exist "%SERVER%" (
   exit /b 1
 )
 
-start "Padaria Debortolo - API" /min "%SERVER%" --urls "%URL%"
+start "Infinite Coffee - API" /min "%SERVER%" --urls "%URL%"
 timeout /t 2 /nobreak >nul
 start "" "%URL%"
 endlocal

@@ -1,11 +1,11 @@
 {
-    "name": "Padaria Debortolo",
-    "short_name": "Padaria Debortolo",
+    "name": "Infinite Coffee",
+    "short_name": "Infinite Coffee",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#111827",
     "theme_color": "#22B8CF",
-    "description": "Sistema de gestão da Padaria Debortolo.",
+    "description": "Sistema integrado de gestão do Infinite Coffee.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

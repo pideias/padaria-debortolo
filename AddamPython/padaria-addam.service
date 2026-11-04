@@ -1,5 +1,5 @@
 [Unit]
-Description=Padaria Debortolo Addam local assistant
+Description=Infinite Coffee Addam local assistant
 After=network.target ollama.service
 Requires=ollama.service
 

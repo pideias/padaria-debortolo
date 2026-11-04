@@ -2,7 +2,7 @@
 
 ## Iniciar a API
 
-No instalador, abra o atalho **Padaria Debortolo**. Ele inicia automaticamente a API local,
+No instalador, abra o atalho **Infinite Coffee**. Ele inicia automaticamente a API local,
 o desktop e o backup do Google Drive quando encontrar uma credencial OAuth no computador.
 
 Na raiz do projeto:

@@ -1,6 +1,6 @@
 ---
 name: ai-project-context
-description: Use when an AI or new developer needs to understand, modify, test, or document the Padaria Debortolo application and its backend; some repository folder names retain the former Infinite Coffee project name.
+description: Use when an AI or new developer needs to understand, modify, test, or document the Infinite Coffee application and its backend; some repository folder names retain legacy project identifiers.
 ---
 
 # Contexto para IAs

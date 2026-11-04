@@ -124,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Padaria Debortolo'),
+        title: const Text('Infinite Coffee'),
         toolbarHeight: desktop ? 76 : null,
         actions: [
           if (!desktop)
@@ -568,7 +568,7 @@ class _DesktopNavigation extends StatelessWidget {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Padaria\nDebortolo',
+                    'Infinite\nCoffee',
                     style: TextStyle(
                       color: Color(0xFF2C1A0E),
                       fontSize: 16,

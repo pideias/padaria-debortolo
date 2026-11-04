@@ -15,7 +15,7 @@ Atue como desenvolvedor senior neste projeto Infinite Coffee.
 4. Para formularios, use `POST` para mutacoes, validacao no servidor e mensagens de erro uteis.
 5. Para Views, reutilize o tema existente e teste desktop e mobile.
 6. Rode `dotnet build InfiniteCoffee2.slnx --no-restore` ao terminar.
-7. A branch `CdmEdu` é a fonte autorizada de Views/Razor/HTML/CSS; em `kaio`, resolva bugs de fluxo no controller/camada `Banco` sem editar Views. Mudanças visuais devem seguir o processo de integração aprovado.
+7. Trabalhe e publique alterações MVC somente na branch `CdmEdu`, fonte autorizada de Views/Razor/HTML/CSS. Não publique alterações na branch `kaio`.
 
 ## Criterios de revisao
 

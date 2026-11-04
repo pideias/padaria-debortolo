@@ -1,3 +1,5 @@
+# Infinite Coffee
+
 ## Guia rapido
 
 Para entender o projeto completo, os contratos da API, o fluxo Flutter, a sincronização e as regras

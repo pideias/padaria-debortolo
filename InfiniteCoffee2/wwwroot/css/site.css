@@ -226,7 +226,7 @@ footer a { color: var(--coffee); }
 .hero-copy h1 span { color: var(--coffee-dark); font-size: .72em; }
 .hero-intro { max-width: 390px; margin: 1.5rem 0; color: var(--ink-soft); font-size: 1.05rem; line-height: 1.7; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
-.bakery-brand-art {
+.coffee-brand-art {
   display: grid;
   min-width: 0;
   min-height: 350px;
@@ -236,7 +236,7 @@ footer a { color: var(--coffee); }
   background: var(--cream);
   box-shadow: var(--shadow);
 }
-.bakery-brand-art img {
+.coffee-brand-art img {
   display: block;
   width: min(100%, 500px);
   max-height: 480px;
@@ -328,8 +328,8 @@ footer a { color: var(--coffee); }
   .navbar-brand img { width: 38px; height: 38px; }
   .hero-copy h1 { font-size: clamp(2.9rem, 15vw, 4.5rem); }
   .hero-intro { font-size: .96rem; }
-  .bakery-brand-art { min-height: 0; padding: .75rem; }
-  .bakery-brand-art img { max-height: 62vh; }
+  .coffee-brand-art { min-height: 0; padding: .75rem; }
+  .coffee-brand-art img { max-height: 62vh; }
   .quick-grid { grid-template-columns: repeat(2, 1fr); }
   .confirmation-meta { grid-template-columns: 1fr; }
 }

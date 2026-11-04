@@ -1,4 +1,4 @@
-# Backlog — Instalador Gratuito da Padaria Debortolo
+# Backlog — Instalador Gratuito do Infinite Coffee
 
 > Objetivo: permitir que uma instalação limpa do Windows coloque o sistema para funcionar
 > com o mínimo de configuração, sem depender de licença paga. O SQL Server continua sendo
@@ -25,7 +25,7 @@ Flutter Mobile ──API HTTPS/VPN──> Backend ──> SQL Server local
 - [x] Criar script de publicação do backend self-contained e Flutter Windows.
 - [x] Criar launcher que inicia a API e abre o navegador.
 - [x] Criar configuração do Inno Setup com atalhos e desinstalação.
-- [ ] Gerar e testar o primeiro `PadariaDebortolo-Setup.exe` em uma máquina limpa.
+- [ ] Gerar e testar o primeiro `InfiniteCoffee-Setup.exe` em uma máquina limpa.
 
 ### Fase 2 — Banco local sem dor de cabeça
 

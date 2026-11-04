@@ -14,5 +14,5 @@ description: Use for any implementation, review, documentation, testing, or rele
 7. Sync: teste push, pull incremental, fila offline, reconexao e conflito de estoque.
 8. Produto excluido deve ser inativado (`ativo = 0`), preservando vendas e auditoria.
 9. Nunca execute limpeza, `DELETE` amplo, `TRUNCATE` ou `DROP` sem confirmacao explicita.
-10. Commit e push somente na branch `kaio`, quando o usuario solicitar.
-11. O workflow `Validate` deve validar pushes em `kaio`, PRs para `master`, backend e Flutter.
+10. Commit e push de desenvolvimento somente na branch `CdmEdu`, quando o responsavel solicitar.
+11. Nao publique alteracoes na branch `kaio`; o workflow `Validate` pode validar pushes em `kaio` e `CdmEdu`, PRs para `master`, backend e Flutter.

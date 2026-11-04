@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Infinite Coffee</title>
+  <desc id="desc">Xícara de café com vapor em forma de infinito.</desc>
+  <circle cx="256" cy="256" r="232" fill="#f5f0e8" stroke="#78340e" stroke-width="12"/>
+  <path d="M145 180c25-42 68-43 111 0l0 0c43 43 86 42 111 0m-222 0c25 42 68 43 111 0l0 0c43-43 86-42 111 0"
+        fill="none" stroke="#b5541a" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M145 252h190v105c0 44-34 78-78 78h-34c-44 0-78-34-78-78z"
+        fill="#fffaf5" stroke="#78340e" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M335 278h30c28 0 45 18 45 43s-17 43-45 43h-31"
+        fill="none" stroke="#78340e" stroke-width="14" stroke-linecap="round"/>
+  <path d="M158 287h164" stroke="#b5541a" stroke-width="12" stroke-linecap="round"/>
+  <path d="M177 449h127" stroke="#78340e" stroke-width="14" stroke-linecap="round"/>
+</svg>

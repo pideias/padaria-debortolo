@@ -1,7 +1,6 @@
-# Aplicativo demonstrativo Padaria Debortolo
+# Aplicativo Infinite Coffee
 
-O projeto teve anteriormente o nome Infinite Coffee. Este diretório contém o cliente Flutter
-multiplataforma do demonstrativo Padaria Debortolo. O mesmo código gera
+Este diretório contém o cliente Flutter multiplataforma do Infinite Coffee. O mesmo código gera
 Android (`flutter build apk`), Windows (`flutter build windows`) e Web.
 
 ## Fonte de contexto
