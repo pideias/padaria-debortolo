@@ -10,6 +10,7 @@ on:
       - master
       - CdmEdu
       - kaio
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,6 +31,13 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore InfiniteCoffee2.slnx -p:TreatWarningsAsErrors=true
+
+      - name: Validate blue-green deployment scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n Installer/Setup-BlueGreen-Hostinger.sh
+          bash -n .github/scripts/deploy-bluegreen-hostinger.sh
 
       - name: Check vulnerable packages
         shell: bash
@@ -143,9 +151,9 @@ jobs:
           if [[ -f ollama.pid ]]; then kill "$(cat ollama.pid)" 2>/dev/null || true; fi
 
   deploy-hostinger:
-    name: Deploy API to Hostinger KVM
+    name: Deploy API blue-green to Hostinger KVM
     needs: validate
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.HOSTINGER_DEPLOY_ENABLED == 'true' }}
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master' && vars.HOSTINGER_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -219,7 +227,7 @@ jobs:
             "$RUNNER_TEMP/padaria-api-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz" \
             "$HOSTINGER_USER@$HOSTINGER_HOST:/tmp/padaria-api-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
 
-      - name: Install, restart and health-check API
+      - name: Deploy to inactive slot and health-check API
         shell: bash
         run: |
           set -euo pipefail
@@ -228,84 +236,8 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$HOSTINGER_USER@$HOSTINGER_HOST" \
-            "bash -s -- '$GITHUB_SHA' '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'" <<'REMOTE'
-          set -euo pipefail
-          sha="$1"
-          run_id="$2"
-          run_attempt="$3"
-          deploy_id="${sha}-${run_id}-${run_attempt}"
-          target=/opt/padaria-api
-          service=padaria-api
-          archive="/tmp/padaria-api-${deploy_id}.tar.gz"
-          stage="/tmp/padaria-api-stage-${deploy_id}"
-          candidate="/opt/padaria-api-candidate-${deploy_id}"
-          backup_dir=/opt/padaria-api-backups
-          backup="${backup_dir}/padaria-api-${deploy_id}"
-          failed="/opt/padaria-api-failed-${deploy_id}"
-
-          run_privileged() {
-            if [[ "$(id -u)" -eq 0 ]]; then
-              "$@"
-            else
-              sudo -n "$@"
-            fi
-          }
-
-          test -f "$archive"
-          run_privileged test -f "$target/app.env"
-          mkdir -m 700 "$stage"
-          tar -xzf "$archive" -C "$stage"
-          test -f "$stage/InfiniteCoffee2.dll"
-          if [[ -e "$stage/app.env" ]]; then
-            echo "Refusing to overwrite the VM's app.env."
-            exit 1
-          fi
-
-          umask 077
-          run_privileged install -d -m 700 "$backup_dir"
-          run_privileged install -d -m 755 "$candidate"
-          run_privileged cp -a "$stage/." "$candidate/"
-          run_privileged cp -a "$target/app.env" "$candidate/app.env"
-          run_privileged chown -R --reference="$target" "$candidate"
-          run_privileged chmod --reference="$target" "$candidate"
-
-          run_privileged systemctl stop "$service"
-          if ! run_privileged mv "$target" "$backup"; then
-            run_privileged systemctl start "$service" || true
-            exit 1
-          fi
-          if ! run_privileged mv "$candidate" "$target"; then
-            run_privileged mv "$backup" "$target"
-            run_privileged systemctl start "$service"
-            exit 1
-          fi
-          if ! run_privileged systemctl start "$service"; then
-            run_privileged mv "$target" "$failed"
-            run_privileged mv "$backup" "$target"
-            run_privileged systemctl start "$service"
-            exit 1
-          fi
-
-          healthy=0
-          for attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8080/api/health; then
-              healthy=1
-              break
-            fi
-            sleep 2
-          done
-          if [[ "$healthy" -ne 1 ]]; then
-            run_privileged journalctl -u "$service" -n 60 --no-pager || true
-            run_privileged systemctl stop "$service" || true
-            run_privileged mv "$target" "$failed"
-            run_privileged mv "$backup" "$target"
-            run_privileged systemctl start "$service"
-            exit 1
-          fi
-
-          rm -rf -- "$stage"
-          rm -f -- "$archive"
-          REMOTE
+            "bash -s -- '$GITHUB_SHA' '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'" \
+            < .github/scripts/deploy-bluegreen-hostinger.sh
 
       - name: Remove temporary SSH key
         if: always()

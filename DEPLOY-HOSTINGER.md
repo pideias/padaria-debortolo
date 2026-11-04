@@ -2,11 +2,31 @@
 
 O workflow `Validate` executa análise, testes e smoke tests. O job `deploy-hostinger`, no mesmo workflow, só publica a API quando:
 
-- o evento é um `push` para `master` (normalmente após o merge aprovado de um pull request);
+- o evento é um `push` para `master` ou uma execução manual (**Run workflow**) selecionando `master`;
 - o job `validate` terminou com sucesso; e
 - a variável de repositório `HOSTINGER_DEPLOY_ENABLED` está definida como `true`.
 
-O deploy publica somente o backend ASP.NET Core. Não altera o APK/Windows, não executa alterações de schema e não copia o arquivo de configuração `app.env`.
+O deploy publica o backend ASP.NET Core e as Views/CSS do site. Não altera APK/Windows, não executa alterações de schema e não copia `app.env`.
+
+## Migração inicial para blue-green
+
+A VM inicialmente servia Kestrel diretamente em `0.0.0.0:8080`, sem proxy. Execute esta migração uma única vez; ela cria Nginx na porta pública `8080` e slots ASP.NET locais em `127.0.0.1:8081` (blue) e `127.0.0.1:8082` (green).
+
+Antes da troca, compile e prepare a publicação Linux x64. Envie a publicação extraída para `/tmp/infinitecoffee-api-stage/` e copie o script de bootstrap:
+
+```powershell
+scp .\Installer\Setup-BlueGreen-Hostinger.sh root@srv1956950.hstgr.cloud:/tmp/
+```
+
+Na VM, rode durante uma janela sem atendimentos abertos. A API atual mantém os identificadores do atendimento em memória; a migração inicial reinicia esse processo uma vez. O script pede confirmação antes do corte:
+
+```bash
+bash /tmp/Setup-BlueGreen-Hostinger.sh /tmp/infinitecoffee-api-stage
+```
+
+O script valida o runtime, `app.env`, ambos os slots e o Nginx antes da troca. Ele faz a troca inicial com breve interrupção e restaura o serviço legado se o health-check falhar. O arquivo `/opt/padaria-api/app.env` é preservado e compartilhado pelos slots. Só depois de o marcador `/etc/padaria-api/bluegreen-ready` existir deve-se mesclar/publicar o workflow blue-green.
+
+Os slots são mantidos para preservar sessões MVC em memória. O cookie `padaria_slot` mantém cada navegador no slot onde iniciou o atendimento; o deploy recusa reutilizar um slot que recebeu tráfego nos últimos 30 minutos (`Session.IdleTimeout`). As portas `8081` e `8082` ficam restritas a loopback; não abra essas portas no firewall.
 
 ## Addam local (serviço Python separado)
 
@@ -61,25 +81,26 @@ Antes de habilitar o workflow, configure a chave pública correspondente em `aut
 
 ## O que ocorre em cada publicação
 
-1. O workflow publica `InfiniteCoffee2.csproj` para `linux-x64`, usando o runtime .NET 10 já instalado na VM.
-2. Envia um pacote temporário via SCP usando a chave armazenada em GitHub Secrets.
+1. O workflow publica `InfiniteCoffee2.csproj` para `linux-x64`, usando o runtime .NET 10 instalado na VM.
+2. Envia o pacote de publicação via SCP usando a chave armazenada nos GitHub Secrets.
 3. Confirma que `/opt/padaria-api/app.env` existe e que o pacote não contém outro `app.env`.
-4. Monta uma versão candidata em `/opt`, copiando o `app.env` existente sem enviá-lo ao GitHub.
-5. Para `padaria-api`, move a versão atual para `/opt/padaria-api-backups/` e coloca a candidata em `/opt/padaria-api`.
-6. Reinicia o serviço e consulta `http://127.0.0.1:8080/api/health`. Se a verificação falhar, move a versão com falha para um diretório separado e restaura a anterior; o job termina como falha para sinalizar a necessidade de inspeção.
+4. Atualiza o slot inativo, inicia-o em loopback e valida `http://127.0.0.1:8081` ou `:8082`.
+5. Troca o upstream do Nginx por reload gracioso e consulta `http://127.0.0.1:8080/api/health`; a instância que atende não é reiniciada.
+6. Se o health-check falhar, restaura o upstream anterior. A versão anterior fica no outro slot para atender sessões MVC existentes.
 
-As versões anteriores ficam na VM em `/opt/padaria-api-backups/`, incluindo seu `app.env`, com permissões restritas; elas não são enviadas como artefatos do GitHub Actions. Depois de confirmar várias publicações estáveis, o responsável pela VM pode remover versões antigas conforme a política de retenção da equipe.
+As versões de slots anteriores ficam na VM em `/opt/padaria-api-backups/slots/`. O único `app.env` permanece em `/opt/padaria-api/app.env` e não é incluído nos pacotes. Depois de confirmar várias publicações estáveis, o responsável pela VM pode remover backups antigos conforme a política de retenção da equipe.
 
 ## O que não é publicado automaticamente
 
 - **Aplicativo Flutter:** APK e Windows são entregues separadamente. Publicar a API não atualiza aplicativos já instalados. O build do cliente precisa apontar para a URL da Hostinger; confira `Installer/Build-Apps.ps1`, cujo valor padrão ainda pode ser diferente.
 - **Banco de dados:** mudanças em tabelas ou procedures precisam de um script versionado, backup e aplicação controlada na VM. O workflow não executa migrations nem o script completo de instalação.
-- **Deploy a partir de `kaio` ou `CdmEdu`:** o job não publica diretamente dessas branches. A publicação é após validação de um push em `master`, de acordo com o fluxo de integração do repositório.
+- **Deploy a partir de `kaio` ou `CdmEdu`:** o job não publica diretamente dessas branches. Integre a `CdmEdu` à `master` por PR aprovado; então o push em `master` ou um `Run workflow` em `master` pode publicar após validação.
 
 ## Primeiro teste
 
 1. Adicione os secrets e a variável no GitHub, mantendo `HOSTINGER_DEPLOY_ENABLED` diferente de `true` enquanto valida os dados.
 2. Confirme o acesso SSH e as permissões do usuário de deploy.
-3. Habilite a variável como `true`.
-4. Após um merge aprovado em `master`, acompanhe **Actions → Validate → Deploy API to Hostinger KVM**.
-5. Confira o status do workflow e, se houver falha, consulte os logs do job e `journalctl -u padaria-api` na VM.
+3. Execute uma vez o bootstrap `Installer/Setup-BlueGreen-Hostinger.sh` na VM, com o site em janela sem atendimentos abertos.
+4. Habilite `HOSTINGER_DEPLOY_ENABLED=true`.
+5. Após um merge aprovado em `master`, acompanhe **Actions → Validate → Deploy API blue-green to Hostinger KVM**. Também é possível usar **Actions → Validate → Run workflow** selecionando `master`.
+6. Confira `/api/health` e, se houver falha, consulte os logs do workflow, `journalctl -u padaria-api-blue`/`padaria-api-green` e Nginx na VM.
