@@ -75,7 +75,7 @@ Em **Settings → Secrets and variables → Actions**, configure a variável e o
 | `HOSTINGER_SSH_PRIVATE_KEY` | Secret | Chave privada dedicada ao deploy, em formato OpenSSH. |
 | `HOSTINGER_KNOWN_HOSTS` | Secret | Linha de chave pública do host, conferida com a impressão digital confiável da VM. |
 
-Não coloque chave privada, senha SQL, connection string ou conteúdo de `app.env` no repositório. Recomenda-se usar uma chave SSH de deploy e uma conta que tenha somente as permissões necessárias: gravar em `/opt/padaria-api` e `/opt/padaria-api-backups` e reiniciar/consultar `padaria-api` sem prompt interativo (`sudo -n`, se não for root).
+Não coloque chave privada, senha SQL, connection string ou conteúdo de `app.env` no repositório. A conta SSH do deploy precisa enviar o pacote a `/tmp`, ler a existência de `/opt/padaria-api/app.env`, atualizar os diretórios de slots e backups, e validar/recarregar os serviços blue/green e Nginx sem prompt interativo (`sudo -n`, se não for root). O conteúdo de `app.env` nunca é enviado ao GitHub.
 
 Antes de habilitar o workflow, configure a chave pública correspondente em `authorized_keys` da VM e confirme a chave do host fora do workflow. A entrada de `HOSTINGER_KNOWN_HOSTS` deve corresponder ao host e à porta configurados; não use uma chave obtida sem verificar sua impressão digital.
 
