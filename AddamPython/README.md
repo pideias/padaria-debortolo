@@ -1,6 +1,6 @@
 # Addam local
 
-Assistente local da Padaria Debortolo, usando `qwen2.5:0.5b` pelo Ollama. O modelo GGUF Q4_K_M do catálogo Ollama tem cerca de 398 MB e licença Apache 2.0. O modelo roda no VPS; não há API de LLM externa nem cobrança por token.
+Assistente local do Infinite Coffee, usando `qwen2.5:0.5b` pelo Ollama. O modelo GGUF Q4_K_M do catálogo Ollama tem cerca de 398 MB e licença Apache 2.0. O modelo roda no VPS; não há API de LLM externa nem cobrança por token.
 
 O modelo interpreta pedidos e pode propor ações permitidas. A tela mostra os campos e pede confirmação; o aplicativo executa a operação pelas APIs REST existentes. O Addam/Python nunca acessa SQL Server nem executa SQL.
 

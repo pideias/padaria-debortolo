@@ -1,4 +1,4 @@
-# Guia para IAs: executar a Padaria Debortolo em outra maquina
+# Guia para IAs: executar o Infinite Coffee em outra maquina
 
 ## Objetivo
 
@@ -99,7 +99,7 @@ dotnet run --project .\InfiniteCoffee2\InfiniteCoffee2.csproj --urls http://0.0.
 Liberar a porta 5049 somente na rede privada do Windows:
 
 ```powershell
-netsh advfirewall firewall add rule name="Padaria Debortolo API" dir=in action=allow protocol=TCP localport=5049 profile=private
+netsh advfirewall firewall add rule name="Infinite Coffee API" dir=in action=allow protocol=TCP localport=5049 profile=private
 ```
 
 ## API remota com Google Drive
@@ -130,13 +130,13 @@ O upload automatico ocorre na inicializacao e depois a cada 30 minutos.
 O atalho instalado executa:
 
 ```text
-Start-PadariaDesktop.cmd
-  -> Start-PadariaDesktop.ps1
+Start-InfiniteCoffeeDesktop.cmd
+  -> Start-InfiniteCoffeeDesktop.ps1
   -> InfiniteCoffee2.exe
   -> infinite_coffee_app.exe
 ```
 
-`Start-PadariaDesktop.ps1`:
+`Start-InfiniteCoffeeDesktop.ps1`:
 
 - inicia a API em `http://0.0.0.0:5049`;
 - procura `client_secret*.json` em `Downloads`, na raiz do drive `D:` e no perfil do usuario;
@@ -148,9 +148,9 @@ Em uma maquina diferente, a IA deve verificar os caminhos de procura e adaptar o
 Arquivos necessarios no instalador:
 
 ```text
-Installer/PadariaDebortolo.iss
-Installer/Start-PadariaDesktop.cmd
-Installer/Start-PadariaDesktop.ps1
+Installer/InfiniteCoffee.iss
+Installer/Start-InfiniteCoffeeDesktop.cmd
+Installer/Start-InfiniteCoffeeDesktop.ps1
 Installer/publish.ps1
 ```
 

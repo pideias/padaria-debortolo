@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Deixar a API da Padaria Debortolo funcionando localmente, com o SQL Server como fonte oficial, sincronizacao das operacoes do mobile e backup dos dados operacionais no Google Drive.
+Deixar a API do Infinite Coffee funcionando localmente, com o SQL Server como fonte oficial, sincronizacao das operacoes do mobile e backup dos dados operacionais no Google Drive.
 
 ## Diagnostico realizado
 
@@ -110,7 +110,7 @@ dotnet run --project InfiniteCoffee2/InfiniteCoffee2.csproj --urls http://0.0.0.
 
 ## Automatizacao do instalador
 
-O atalho do instalador agora executa `Start-PadariaDesktop.ps1`. Esse script:
+O atalho do instalador agora executa `Start-InfiniteCoffeeDesktop.ps1`. Esse script:
 
 - inicia a API local em `http://0.0.0.0:5049`;
 - procura automaticamente arquivos `client_secret*.json` em `Downloads`, na raiz do drive `D:` e no perfil do usuario;

@@ -1,4 +1,4 @@
-# Plano de Integracao — Padaria Debortolo
+# Plano de Integracao — Infinite Coffee
 
 Este documento e o contexto oficial para outro agente de IA implementar a integracao no
 repositorio `https://github.com/pideias/padaria-debortolo`. **Nao implementar este plano no
@@ -6,13 +6,13 @@ repositorio `pideias-infinittecoffee`.**
 
 ## Objetivo final
 
-Fazer Web, desktop Windows e mobile do Debortolo usarem a mesma API central e trabalharem
+Fazer Web, desktop Windows e mobile do Infinite Coffee usarem a mesma API central e trabalharem
 com os mesmos dados. O Google Drive sera apenas backup/snapshot, nunca o banco principal.
 
 ```text
-Web Debortolo
-Desktop Debortolo  ──> API central Debortolo ──> SQL Server principal
-Mobile Debortolo                                  |
+Web Infinite Coffee
+Desktop Infinite Coffee  ──> API central Infinite Coffee ──> SQL Server principal
+Mobile Infinite Coffee                                  |
                                                    v
                                            Backup Google Drive
 ```
@@ -22,7 +22,7 @@ que possivel; nao reescrever todos os controllers.
 
 ---
 
-## 1. O que ja existe no Debortolo
+## 1. O que ja existe no Infinite Coffee
 
 Repositorio e branch observados:
 
@@ -130,7 +130,7 @@ Nao alterar as APIs. Apenas configurar o Web para consumir a API central:
 Adicionar um adapter/servico no Web ou na API, sem alterar os controllers existentes:
 
 ```text
-Web Infinite Coffee -> Adapter -> API Debortolo
+Web Infinite Coffee -> Adapter -> API Infinite Coffee
 ```
 
 O adapter traduz nomes de campos e respostas. So criar endpoint novo quando o contrato
@@ -299,7 +299,7 @@ Nao remover rotas nem trocar nomes de campos sem adapter e plano de migracao.
 
 ### Fase 2 — API central
 
-1. Escolher a API do Debortolo como API central.
+1. Escolher a API do Infinite Coffee como API central.
 2. Preservar controllers existentes.
 3. Corrigir `API_BASE_URL` por plataforma.
 4. Garantir CORS para Web.

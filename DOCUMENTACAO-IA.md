@@ -1,12 +1,11 @@
 # Documentação para IAs e Desenvolvedores
 
-Este arquivo resume o estado implementado do demonstrativo Padaria Debortolo. Infinite Coffee
-foi o nome anterior do projeto. Antes de alterar o código, leia este arquivo, `AGENTS.md`,
+Este arquivo resume o estado implementado do sistema Infinite Coffee. Antes de alterar o código, leia este arquivo, `AGENTS.md`,
 `README.md` e a skill relacionada ao fluxo.
 
 ## Identidade do projeto
 
-- Aplicativo demonstrativo: Padaria Debortolo. Nome anterior do projeto: Infinite Coffee.
+- Nome do sistema: Infinite Coffee.
 - Backend: ASP.NET Core MVC em .NET 10.
 - Banco oficial: SQL Server; o identificador do banco no script é `infiniteCoffee`.
 - Acesso ao banco: `InfiniteCoffee2/Data/Banco.cs`.

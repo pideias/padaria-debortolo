@@ -28,7 +28,7 @@ void main() {
 
     expect(
       find.text(
-        'Olá! Sou o Addam, assistente da Padaria Debortolo. Posso conversar sobre '
+        'Olá! Sou o Addam, assistente do Infinite Coffee. Posso conversar sobre '
         'estoque e preparar cadastros, vendas e movimentações. Antes de gravar, '
         'vou mostrar uma proposta para você revisar e confirmar.',
       ),

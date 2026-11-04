@@ -30,7 +30,7 @@ class _InfiniteCoffeeAppState extends State<InfiniteCoffeeApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Padaria Debortolo',
+      title: 'Infinite Coffee',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: HomeScreen(repository: _repository),
