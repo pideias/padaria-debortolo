@@ -8,6 +8,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+		<!-- Sobrepõe a versão transitiva vulnerável trazida pelo SqlClient 7.0.2. -->
+		<PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.22" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
 	</ItemGroup>
 
