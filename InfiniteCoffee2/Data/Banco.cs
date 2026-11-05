@@ -245,8 +245,8 @@ namespace InfiniteCoffee2.Data
             {
                 using var cmd = new SqlCommand(@"
                     INSERT INTO Produtos (nome_produto, preco, tipo, quantidade_estoque, codigo_barras, descricao)
-                    OUTPUT INSERTED.id_produto
-                    VALUES (@nome, @preco, @tipo, @quantidade, @codigoBarras, @descricao)", conn, transaction);
+                    VALUES (@nome, @preco, @tipo, @quantidade, @codigoBarras, @descricao);
+                    SELECT CONVERT(INT, SCOPE_IDENTITY());", conn, transaction);
                 cmd.Parameters.AddWithValue("@nome", nome);
                 cmd.Parameters.AddWithValue("@preco", preco);
                 cmd.Parameters.AddWithValue("@tipo", tipo);
